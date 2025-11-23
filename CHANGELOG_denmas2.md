@@ -1,4 +1,4 @@
-# DennHub - Fish It v2.0 Changes
+# Denmas Hub - Fish It v2.0 Changes
 
 ## ✨ Major Improvements
 

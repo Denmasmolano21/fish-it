@@ -161,10 +161,10 @@ end
 -------------------------------------------
 
 local Window = WindUI:CreateWindow({
-    Title = "DennHub - Fish It",
+    Title = "Denmas Hub - Fish It",
     Icon = "fish",
     Author = "by @denmas._",
-    Folder = "DennHub",
+    Folder = "Denmas Hub",
     Size = UDim2.fromOffset(600, 450),
     Theme = "Indigo",
     KeySystem = false
@@ -175,7 +175,7 @@ Window:SetToggleKey(Enum.KeyCode.G)
 WindUI:SetNotificationLower(true)
 
 WindUI:Notify({
-	Title = "DennHub - Fish It",
+	Title = "Denmas Hub - Fish It",
 	Content = "All Features Loaded Successfully!",
 	Duration = 5,
 	Image = "square-check-big"
@@ -837,7 +837,7 @@ ConfigSection:Paragraph({
 })
 
 local ConfigManager = Window.ConfigManager
-local myConfig = ConfigManager:CreateConfig("DennHubConfig")
+local myConfig = ConfigManager:CreateConfig("Denmas HubConfig")
 
 ConfigSection:Button({
     Title = "Save Settings",

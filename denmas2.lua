@@ -7,15 +7,16 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
 
 if not LocalPlayer then
     warn("[DennHub] Script must be executed as LocalScript")
     return
 end
 
--- Load net services
+-- Load net services with proper error handling
 local net
-local netSuccess = pcall(function()
+local netSuccess, netError = pcall(function()
     net = ReplicatedStorage:WaitForChild("Packages", 5)
         :WaitForChild("_Index", 5)
         :WaitForChild("sleitnick_net@0.2.0", 5)
@@ -23,15 +24,37 @@ local netSuccess = pcall(function()
 end)
 
 if not netSuccess or not net then
-    warn("[DennHub] Failed to load net remotes")
+    warn("[DennHub] Failed to load net remotes: " .. tostring(netError))
     return
+end
+
+-- Load Replion and ItemUtility with proper error handling
+local Replion, ItemUtility
+local replionSuccess = pcall(function()
+    Replion = require(ReplicatedStorage:WaitForChild("Packages", 5)
+        :WaitForChild("_Index", 5)
+        :WaitForChild("probablynotacat_replion@1.1.3", 5)
+        :WaitForChild("replion", 5))
+end)
+
+local itemUtilSuccess = pcall(function()
+    ItemUtility = require(ReplicatedStorage:WaitForChild("Modules", 5)
+        :WaitForChild("ItemUtility", 5))
+end)
+
+if not replionSuccess then
+    warn("[DennHub] Replion not loaded - Auto Sell/Favorite disabled")
+end
+
+if not itemUtilSuccess then
+    warn("[DennHub] ItemUtility not loaded - Auto Favorite disabled")
 end
 
 local state = {
     AutoFish = false,
     AutoSell = false,
     AutoFavourite = false,
-    AntiAFK = true,
+    AntiAFK = false,
     FPSBoost = false
 }
 
@@ -40,18 +63,13 @@ local rodRemote = net:FindFirstChild("RF/ChargeFishingRod")
 local miniGameRemote = net:FindFirstChild("RF/RequestFishingMinigameStarted")
 local finishRemote = net:FindFirstChild("RE/FishingCompleted")
 
--- Auto Reconnect system
-local TeleportState = TeleportService.OnTeleport:Connect(function(teleportState)
-    if teleportState == Enum.TeleportState.Failed then
-        task.wait(2)
-        TeleportService:Teleport(game.PlaceId, LocalPlayer)
-    end
-end)
-
 -- Auto Sell configuration
 local lastSellTime = 0
 local AUTO_SELL_THRESHOLD = 60
 local AUTO_SELL_DELAY = 60
+
+-- Anti-AFK Connection
+local antiAFKConnection = nil
 
 -------------------------------------------
 ----- AUTO FEATURE SYSTEMS
@@ -59,83 +77,130 @@ local AUTO_SELL_DELAY = 60
 
 -- Simple Notification System
 local function ShowNotification(title, message, duration)
-    local NotifGui = Instance.new("ScreenGui")
-    NotifGui.Name = "NotificationGui"
-    NotifGui.DisplayOrder = 1000
-    NotifGui.ResetOnSpawn = false
-    NotifGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5)
+    task.spawn(function()
+        local success = pcall(function()
+            local NotifGui = Instance.new("ScreenGui")
+            NotifGui.Name = "NotificationGui"
+            NotifGui.DisplayOrder = 1000
+            NotifGui.ResetOnSpawn = false
+            NotifGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5)
 
-    local NotifFrame = Instance.new("Frame")
-    NotifFrame.Name = "NotificationFrame"
-    NotifFrame.Parent = NotifGui
-    NotifFrame.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
-    NotifFrame.Size = UDim2.new(0, 300, 0, 80)
-    NotifFrame.Position = UDim2.new(0.5, -150, 0, 20)
-    NotifFrame.BorderSizePixel = 0
+            local NotifFrame = Instance.new("Frame")
+            NotifFrame.Name = "NotificationFrame"
+            NotifFrame.Parent = NotifGui
+            NotifFrame.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
+            NotifFrame.Size = UDim2.new(0, 300, 0, 80)
+            NotifFrame.Position = UDim2.new(0.5, -150, 0, 20)
+            NotifFrame.BorderSizePixel = 0
 
-    local corner = Instance.new("UICorner", NotifFrame)
-    corner.CornerRadius = UDim.new(0, 8)
+            local corner = Instance.new("UICorner", NotifFrame)
+            corner.CornerRadius = UDim.new(0, 8)
 
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Parent = NotifFrame
-    titleLabel.Text = title
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 14
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Position = UDim2.new(0, 10, 0, 5)
-    titleLabel.Size = UDim2.new(1, -20, 0, 25)
+            local titleLabel = Instance.new("TextLabel")
+            titleLabel.Parent = NotifFrame
+            titleLabel.Text = title
+            titleLabel.Font = Enum.Font.GothamBold
+            titleLabel.TextSize = 14
+            titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            titleLabel.BackgroundTransparency = 1
+            titleLabel.Position = UDim2.new(0, 10, 0, 5)
+            titleLabel.Size = UDim2.new(1, -20, 0, 25)
+            titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-    local msgLabel = Instance.new("TextLabel")
-    msgLabel.Parent = NotifFrame
-    msgLabel.Text = message
-    msgLabel.Font = Enum.Font.Gotham
-    msgLabel.TextSize = 11
-    msgLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    msgLabel.BackgroundTransparency = 1
-    msgLabel.Position = UDim2.new(0, 10, 0, 30)
-    msgLabel.Size = UDim2.new(1, -20, 0, 40)
-    msgLabel.TextWrapped = true
+            local msgLabel = Instance.new("TextLabel")
+            msgLabel.Parent = NotifFrame
+            msgLabel.Text = message
+            msgLabel.Font = Enum.Font.Gotham
+            msgLabel.TextSize = 11
+            msgLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            msgLabel.BackgroundTransparency = 1
+            msgLabel.Position = UDim2.new(0, 10, 0, 30)
+            msgLabel.Size = UDim2.new(1, -20, 0, 40)
+            msgLabel.TextWrapped = true
+            msgLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-    task.delay(duration or 3, function()
-        if NotifGui then
-            NotifGui:Destroy()
+            task.wait(duration or 3)
+            if NotifGui and NotifGui.Parent then
+                NotifGui:Destroy()
+            end
+        end)
+        
+        if not success then
+            warn("[DennHub] Failed to show notification")
         end
     end)
 end
 
--- FPS Boost Function
+-- FPS Boost Function (Safe version)
 local function BoostFPS()
-    for _, v in pairs(game:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.Material = Enum.Material.SmoothPlastic
-            v.Reflectance = 0
-        elseif v:IsA("Decal") or v:IsA("Texture") then
-            v.Transparency = 1
+    task.spawn(function()
+        local success = pcall(function()
+            -- Optimize workspace objects
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.Material = Enum.Material.SmoothPlastic
+                    v.Reflectance = 0
+                elseif v:IsA("Decal") or v:IsA("Texture") then
+                    v.Transparency = 1
+                end
+            end
+
+            -- Optimize lighting
+            local Lighting = game:GetService("Lighting")
+            for _, effect in pairs(Lighting:GetChildren()) do
+                if effect:IsA("PostEffect") then
+                    effect.Enabled = false
+                end
+            end
+
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 1e10
+
+            -- Set quality level
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            
+            ShowNotification("FPS Boost", "Performance optimized!", 2)
+        end)
+        
+        if not success then
+            ShowNotification("Error", "FPS Boost failed!", 2)
         end
+    end)
+end
+
+-- Anti-AFK Function (Compliant version)
+local function EnableAntiAFK()
+    if antiAFKConnection then
+        antiAFKConnection:Disconnect()
     end
+    
+    antiAFKConnection = LocalPlayer.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+    
+    ShowNotification("Anti-AFK", "Enabled successfully!", 2)
+end
 
-    local Lighting = game:GetService("Lighting")
-    for _, effect in pairs(Lighting:GetChildren()) do
-        if effect:IsA("PostEffect") then
-            effect.Enabled = false
-        end
+local function DisableAntiAFK()
+    if antiAFKConnection then
+        antiAFKConnection:Disconnect()
+        antiAFKConnection = nil
+        ShowNotification("Anti-AFK", "Disabled", 2)
     end
-
-    Lighting.GlobalShadows = false
-    Lighting.FogEnd = 1e10
-
-    settings().Rendering.QualityLevel = "Level01"
 end
 
 -- Auto Sell Function
 local function startAutoSell()
     task.spawn(function()
         while state.AutoSell do
-            pcall(function()
+            local success = pcall(function()
                 if not Replion then return end
+                
                 local DataReplion = Replion.Client:WaitReplion("Data")
-                local items = DataReplion and DataReplion:Get({"Inventory","Items"})
+                if not DataReplion then return end
+                
+                local items = DataReplion:Get({"Inventory","Items"})
                 if type(items) ~= "table" then return end
 
                 -- Count non-favorited fish
@@ -150,12 +215,21 @@ local function startAutoSell()
                 if unfavoritedCount >= AUTO_SELL_THRESHOLD and os.time() - lastSellTime >= AUTO_SELL_DELAY then
                     local sellFunc = net:FindFirstChild("RF/SellAllItems")
                     if sellFunc then
-                        task.spawn(sellFunc.InvokeServer, sellFunc)
-                        ShowNotification("Auto Sell", "Selling non-favorited fish...")
+                        task.spawn(function()
+                            pcall(function()
+                                sellFunc:InvokeServer()
+                            end)
+                        end)
+                        ShowNotification("Auto Sell", "Selling " .. unfavoritedCount .. " fish...")
                         lastSellTime = os.time()
                     end
                 end
             end)
+            
+            if not success then
+                warn("[DennHub] Auto Sell error")
+            end
+            
             task.wait(10)
         end
     end)
@@ -165,25 +239,41 @@ end
 local function startAutoFavourite()
     task.spawn(function()
         while state.AutoFavourite do
-            pcall(function()
+            local success = pcall(function()
                 if not Replion or not ItemUtility then return end
+                
                 local DataReplion = Replion.Client:WaitReplion("Data")
-                local items = DataReplion and DataReplion:Get({"Inventory","Items"})
+                if not DataReplion then return end
+                
+                local items = DataReplion:Get({"Inventory","Items"})
                 if type(items) ~= "table" then return end
                 
-                local allowedTiers = { ["Secret"] = true, ["Mythic"] = true, ["Legendary"] = true }
+                local allowedTiers = { 
+                    ["Secret"] = true, 
+                    ["Mythic"] = true, 
+                    ["Legendary"] = true 
+                }
+                
                 local count = 0
                 for _, item in ipairs(items) do
-                    local base = ItemUtility:GetItemData(item.Id)
-                    if base and base.Data and allowedTiers[base.Data.Tier] and not item.Favorited then
-                        item.Favorited = true
-                        count = count + 1
+                    if not item.Favorited then
+                        local base = ItemUtility:GetItemData(item.Id)
+                        if base and base.Data and allowedTiers[base.Data.Tier] then
+                            item.Favorited = true
+                            count = count + 1
+                        end
                     end
                 end
+                
                 if count > 0 then
                     ShowNotification("Auto Favorite", "Favorited " .. count .. " valuable fish!")
                 end
             end)
+            
+            if not success then
+                warn("[DennHub] Auto Favorite error")
+            end
+            
             task.wait(5)
         end
     end)
@@ -191,70 +281,116 @@ end
 
 -- Manual Sell All Fishes
 local function sellAllFishes()
-    local charFolder = workspace:FindFirstChild("Characters")
-    local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then
-        ShowNotification("Error", "Character not found!")
-        return
-    end
-
     task.spawn(function()
-        ShowNotification("Selling", "Selling all fish, please wait...")
-        task.wait(1)
-        local sellRemote = net:WaitForChild("RF/SellAllItems")
-        pcall(function()
-            sellRemote:InvokeServer()
-            ShowNotification("Success", "All fish sold!", 3)
+        local success = pcall(function()
+            local charFolder = workspace:FindFirstChild("Characters")
+            if not charFolder then
+                ShowNotification("Error", "Characters folder not found!")
+                return
+            end
+            
+            local char = charFolder:FindFirstChild(LocalPlayer.Name)
+            if not char then
+                ShowNotification("Error", "Character not found!")
+                return
+            end
+            
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hrp then
+                ShowNotification("Error", "HumanoidRootPart not found!")
+                return
+            end
+
+            ShowNotification("Selling", "Selling all fish, please wait...")
+            task.wait(1)
+            
+            local sellRemote = net:WaitForChild("RF/SellAllItems", 5)
+            if sellRemote then
+                sellRemote:InvokeServer()
+                ShowNotification("Success", "All fish sold!", 3)
+            else
+                ShowNotification("Error", "Sell remote not found!")
+            end
         end)
+        
+        if not success then
+            ShowNotification("Error", "Failed to sell fish!")
+        end
     end)
 end
 
 -- Auto Enchant Rod
 local function autoEnchantRod()
-    local ENCHANT_POSITION = Vector3.new(3231, -1303, 1402)
-    local char = workspace:WaitForChild("Characters"):FindFirstChild(LocalPlayer.Name)
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-
-    if not hrp then
-        ShowNotification("Error", "Failed to get character!")
-        return
-    end
-
     task.spawn(function()
-        ShowNotification("Info", "Place Enchant Stone in slot 5 first!", 5)
-        task.wait(3)
+        local success = pcall(function()
+            local ENCHANT_POSITION = Vector3.new(3231, -1303, 1402)
+            
+            local charFolder = workspace:WaitForChild("Characters", 5)
+            local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
+            if not char then
+                ShowNotification("Error", "Character not found!")
+                return
+            end
+            
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hrp then
+                ShowNotification("Error", "Failed to get character!")
+                return
+            end
 
-        local Player = game:GetService("Players").LocalPlayer
-        local slot5 = Player.PlayerGui.Backpack.Display:GetChildren()[10]
+            ShowNotification("Info", "Place Enchant Stone in slot 5 first!", 5)
+            task.wait(3)
 
-        local itemName = slot5 and slot5:FindFirstChild("Inner") and slot5.Inner:FindFirstChild("Tags") and slot5.Inner.Tags:FindFirstChild("ItemName")
+            local backpack = LocalPlayer.PlayerGui:FindFirstChild("Backpack")
+            if not backpack or not backpack:FindFirstChild("Display") then
+                ShowNotification("Error", "Backpack not found!")
+                return
+            end
 
-        if not itemName or not itemName.Text:lower():find("enchant") then
-            ShowNotification("Error", "Slot 5 must have Enchant Stone!")
-            return
-        end
+            local children = backpack.Display:GetChildren()
+            if #children < 10 then
+                ShowNotification("Error", "Not enough items in backpack!")
+                return
+            end
 
-        ShowNotification("Info", "Enchanting in progress...", 7)
+            local slot5 = children[10]
+            local itemName = slot5 and slot5:FindFirstChild("Inner") 
+                and slot5.Inner:FindFirstChild("Tags") 
+                and slot5.Inner.Tags:FindFirstChild("ItemName")
 
-        local originalPosition = hrp.Position
-        task.wait(1)
-        hrp.CFrame = CFrame.new(ENCHANT_POSITION + Vector3.new(0, 5, 0))
-        task.wait(1.2)
+            if not itemName or not string.find(string.lower(itemName.Text), "enchant") then
+                ShowNotification("Error", "Slot 5 must have Enchant Stone!")
+                return
+            end
 
-        local equipRod = net:WaitForChild("RE/EquipToolFromHotbar")
-        local activateEnchant = net:WaitForChild("RE/ActivateEnchantingAltar")
+            ShowNotification("Info", "Enchanting in progress...", 7)
 
-        pcall(function()
-            equipRod:FireServer(5)
-            task.wait(0.5)
-            activateEnchant:FireServer()
-            task.wait(7)
-            ShowNotification("Success", "Rod enchanted!", 3)
+            local originalPosition = hrp.Position
+            task.wait(1)
+            
+            hrp.CFrame = CFrame.new(ENCHANT_POSITION + Vector3.new(0, 5, 0))
+            task.wait(1.2)
+
+            local equipRod = net:WaitForChild("RE/EquipToolFromHotbar", 5)
+            local activateEnchant = net:WaitForChild("RE/ActivateEnchantingAltar", 5)
+
+            if equipRod and activateEnchant then
+                equipRod:FireServer(5)
+                task.wait(0.5)
+                activateEnchant:FireServer()
+                task.wait(7)
+                ShowNotification("Success", "Rod enchanted!", 3)
+            else
+                ShowNotification("Error", "Enchant remotes not found!")
+            end
+
+            task.wait(0.9)
+            hrp.CFrame = CFrame.new(originalPosition + Vector3.new(0, 3, 0))
         end)
-
-        task.wait(0.9)
-        hrp.CFrame = CFrame.new(originalPosition + Vector3.new(0, 3, 0))
+        
+        if not success then
+            ShowNotification("Error", "Enchanting failed!")
+        end
     end)
 end
 
@@ -696,7 +832,7 @@ local RodReelAnim = RodReel and animator:LoadAnimation(RodReel)
 
 local function getValidRodName()
     local success, display = pcall(function()
-        return LocalPlayer.PlayerGui:WaitForChild("Backpack"):WaitForChild("Display")
+        return LocalPlayer.PlayerGui:WaitForChild("Backpack", 5):WaitForChild("Display", 5)
     end)
     
     if not success or not display then return nil end
@@ -839,18 +975,25 @@ local function TeleportToIsland(islandName)
         return
     end
     
-    pcall(function()
-        local position = islandCoords[islandName]
-        local charFolder = workspace:WaitForChild("Characters", 5)
-        local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
-        if not char then
-            warn("[DennHub] Character not found in workspace")
-            return
-        end
+    task.spawn(function()
+        local success = pcall(function()
+            local position = islandCoords[islandName]
+            local charFolder = workspace:WaitForChild("Characters", 5)
+            local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
+            if not char then
+                ShowNotification("Error", "Character not found!")
+                return
+            end
+            
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = CFrame.new(position + Vector3.new(0, 5, 0))
+                ShowNotification("Teleport", "Teleported to " .. islandName, 2)
+            end
+        end)
         
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.CFrame = CFrame.new(position + Vector3.new(0, 5, 0))
+        if not success then
+            ShowNotification("Error", "Teleport failed!")
         end
     end)
 end
@@ -876,25 +1019,29 @@ local function PopulateAutoFishing()
     end)
 
     -- Auto Sell Section
-    CreateLabel(PageAutoFishing, "Auto Sell", "Automatically sells non-favorited fish")
-    CreateToggle(PageAutoFishing, "Auto Sell", false, function(value)
-        state.AutoSell = value
-        if value then
-            startAutoSell()
-        end
-    end)
-    CreateButton(PageAutoFishing, "Sell All Fishes", function()
-        sellAllFishes()
-    end)
+    if Replion then
+        CreateLabel(PageAutoFishing, "Auto Sell", "Automatically sells non-favorited fish")
+        CreateToggle(PageAutoFishing, "Auto Sell", false, function(value)
+            state.AutoSell = value
+            if value then
+                startAutoSell()
+            end
+        end)
+        CreateButton(PageAutoFishing, "Sell All Fishes", function()
+            sellAllFishes()
+        end)
+    end
 
     -- Auto Favorite Section
-    CreateLabel(PageAutoFishing, "Auto Favorite", "Protects valuable fish from selling")
-    CreateToggle(PageAutoFishing, "Auto Favorite", false, function(value)
-        state.AutoFavourite = value
-        if value then
-            startAutoFavourite()
-        end
-    end)
+    if Replion and ItemUtility then
+        CreateLabel(PageAutoFishing, "Auto Favorite", "Protects valuable fish from selling")
+        CreateToggle(PageAutoFishing, "Auto Favorite", false, function(value)
+            state.AutoFavourite = value
+            if value then
+                startAutoFavourite()
+            end
+        end)
+    end
 
     -- Manual Actions
     CreateLabel(PageAutoFishing, "Manual Actions", "Additional fishing tools")
@@ -919,12 +1066,16 @@ local function PopulateUtility()
     CreateLabel(PageUtility, "Server Management", "Manage your connection")
 
     CreateButton(PageUtility, "Rejoin Server", function()
-        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+        task.spawn(function()
+            pcall(function()
+                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+            end)
+        end)
     end)
 
     CreateButton(PageUtility, "Server Hop", function()
         task.spawn(function()
-            pcall(function()
+            local success = pcall(function()
                 local placeId = game.PlaceId
                 local servers = {}
                 local cursor = ""
@@ -934,16 +1085,16 @@ local function PopulateUtility()
                     if attempts >= 3 then break end
                     attempts = attempts + 1
                     
-                    local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
+                    local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100", placeId)
                     if cursor ~= "" then
                         url = url .. "&cursor=" .. cursor
                     end
 
-                    local success, result = pcall(function()
+                    local httpSuccess, result = pcall(function()
                         return HttpService:JSONDecode(game:HttpGet(url))
                     end)
 
-                    if success and result and result.data then
+                    if httpSuccess and result and result.data then
                         for _, server in pairs(result.data) do
                             if server.playing and server.maxPlayers then
                                 if server.playing < server.maxPlayers and server.id ~= game.JobId then
@@ -962,8 +1113,14 @@ local function PopulateUtility()
                 if #servers > 0 then
                     local targetServer = servers[math.random(1, #servers)]
                     TeleportService:TeleportToPlaceInstance(placeId, targetServer, LocalPlayer)
+                else
+                    ShowNotification("Error", "No available servers found!")
                 end
             end)
+            
+            if not success then
+                ShowNotification("Error", "Server hop failed!")
+            end
         end)
     end)
 
@@ -972,24 +1129,40 @@ local function PopulateUtility()
     local eventsList = { "Shark Hunt", "Ghost Shark Hunt", "Worm Hunt", "Black Hole", "Shocked", "Ghost Worm", "Meteor Rain" }
     
     CreateDropdown(PageUtility, "Select Event", eventsList, function(option)
-        local props = workspace:FindFirstChild("Props")
-        if props and props:FindFirstChild(option) and props[option]:FindFirstChild("Fishing Boat") then
-            local fishingBoat = props[option]["Fishing Boat"]
-            local boatCFrame = fishingBoat:GetPivot()
-            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                hrp.CFrame = boatCFrame + Vector3.new(0, 15, 0)
+        task.spawn(function()
+            local success = pcall(function()
+                local props = workspace:FindFirstChild("Props")
+                if not props then
+                    ShowNotification("Error", "Props folder not found!")
+                    return
+                end
+                
+                if props:FindFirstChild(option) and props[option]:FindFirstChild("Fishing Boat") then
+                    local fishingBoat = props[option]["Fishing Boat"]
+                    local boatCFrame = fishingBoat:GetPivot()
+                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        hrp.CFrame = boatCFrame + Vector3.new(0, 15, 0)
+                        ShowNotification("Teleport", "Teleported to " .. option, 2)
+                    end
+                else
+                    ShowNotification("Error", "Event not found!")
+                end
+            end)
+            
+            if not success then
+                ShowNotification("Error", "Event teleport failed!")
             end
-        end
+        end)
     end)
 
     -- NPC Teleport
     CreateLabel(PageUtility, "NPC Teleport", "Teleport to NPCs")
-    local npcFolder = pcall(function()
-        return game:GetService("ReplicatedStorage"):WaitForChild("NPC", 2)
-    end) and game:GetService("ReplicatedStorage"):FindFirstChild("NPC") or nil
+    local success, npcFolder = pcall(function()
+        return ReplicatedStorage:WaitForChild("NPC", 2)
+    end)
 
-    if npcFolder then
+    if success and npcFolder then
         local npcList = {}
         for _, npc in pairs(npcFolder:GetChildren()) do
             if npc:IsA("Model") then
@@ -1001,20 +1174,45 @@ local function PopulateUtility()
         end
 
         if #npcList > 0 then
+            table.sort(npcList)
             CreateDropdown(PageUtility, "Select NPC", npcList, function(selectedName)
-                local npc = npcFolder:FindFirstChild(selectedName)
-                if npc and npc:IsA("Model") then
-                    local hrp = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
-                    if hrp then
-                        local charFolder = workspace:FindFirstChild("Characters", 5)
-                        local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
-                        if not char then return end
+                task.spawn(function()
+                    local teleportSuccess = pcall(function()
+                        local npc = npcFolder:FindFirstChild(selectedName)
+                        if not npc or not npc:IsA("Model") then
+                            ShowNotification("Error", "NPC not found!")
+                            return
+                        end
+                        
+                        local hrp = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+                        if not hrp then
+                            ShowNotification("Error", "NPC position not found!")
+                            return
+                        end
+                        
+                        local charFolder = workspace:FindFirstChild("Characters")
+                        if not charFolder then
+                            ShowNotification("Error", "Characters folder not found!")
+                            return
+                        end
+                        
+                        local char = charFolder:FindFirstChild(LocalPlayer.Name)
+                        if not char then
+                            ShowNotification("Error", "Character not found!")
+                            return
+                        end
+                        
                         local myHRP = char:FindFirstChild("HumanoidRootPart")
                         if myHRP then
                             myHRP.CFrame = hrp.CFrame + Vector3.new(0, 3, 0)
+                            ShowNotification("Teleport", "Teleported to " .. selectedName, 2)
                         end
+                    end)
+                    
+                    if not teleportSuccess then
+                        ShowNotification("Error", "NPC teleport failed!")
                     end
-                end
+                end)
             end)
         end
     end
@@ -1022,19 +1220,12 @@ end
 
 local function PopulateSettings()
     CreateLabel(PageSettings, "General Settings", "Configure preferences")
-    CreateToggle(PageSettings, "Anti-AFK", true, function(value)
+    CreateToggle(PageSettings, "Anti-AFK", false, function(value)
         state.AntiAFK = value
         if value then
-            local connections = getconnections(LocalPlayer.Idled)
-            if connections and #connections > 0 then
-                for _, connection in ipairs(connections) do
-                    if connection and connection.Connected then
-                        pcall(function()
-                            connection:Disable()
-                        end)
-                    end
-                end
-            end
+            EnableAntiAFK()
+        else
+            DisableAntiAFK()
         end
     end)
 
@@ -1048,15 +1239,7 @@ local function PopulateSettings()
     end)
 
     -- About Section
-    CreateLabel(PageSettings, "About", "DennHub Fish It v2.1 | @denmas._")
-end
-                        end)
-                    end
-                end
-            end
-        end
-    end)
-    CreateLabel(PageSettings, "About", "DennHub Fish It v2.1 | @denmas._")
+    CreateLabel(PageSettings, "About", "Denmas | Fish It v2.1 | @denmas._")
 end
 
 -------------------------------------------
@@ -1125,26 +1308,45 @@ local TabSettings = CreateTabButton("Settings", "[S]", PageSettings, PopulateSet
 
 local cleanup = function()
     StopAutoFish()
-    if ScreenGui then
+    DisableAntiAFK()
+    if ScreenGui and ScreenGui.Parent then
         ScreenGui:Destroy()
     end
 end
 
 game:BindToClose(cleanup)
 
-LocalPlayer.CharacterAdded:Connect(function()
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     task.wait(0.5)
     StopAutoFish()
+    
+    -- Reload character-dependent variables
+    character = newCharacter
+    humanoid = character:WaitForChild("Humanoid", 5)
+    animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+    
+    -- Reload animations
+    if RodShake then
+        RodShakeAnim = animator:LoadAnimation(RodShake)
+    end
+    if RodIdle then
+        RodIdleAnim = animator:LoadAnimation(RodIdle)
+    end
+    if RodReel then
+        RodReelAnim = animator:LoadAnimation(RodReel)
+    end
 end)
 
 -- Show first tab by default (populate immediately)
-
-PopulateAutoFishing()
-pagePopulated["Auto Fishing"] = true
-
-PageAutoFishing.Visible = true
-TabAutoFishing.BackgroundColor3 = COLOR_BLUE
-TabAutoFishing.TextColor3 = Color3.fromRGB(255, 255, 255)
-selectedTab = TabAutoFishing
-
-print("[DennHub] Fish It v2.1 Loaded Successfully!")
+task.defer(function()
+    PopulateAutoFishing()
+    pagePopulated["Auto Fishing"] = true
+    
+    PageAutoFishing.Visible = true
+    TabAutoFishing.BackgroundColor3 = COLOR_BLUE
+    TabAutoFishing.TextColor3 = Color3.fromRGB(255, 255, 255)
+    selectedTab = TabAutoFishing
+    
+    print("[DennHub] Fish It v2.1 Loaded Successfully!")
+    ShowNotification("DennHub", "Fish It v2.1 loaded successfully!", 3)
+end)

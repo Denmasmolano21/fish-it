@@ -1,4 +1,4 @@
-# DennHub - Fish It v2.1 - Roblox Best Practices Implementation
+# Denmas Hub - Fish It v2.1 - Roblox Best Practices Implementation
 
 ## Overview
 
@@ -29,7 +29,7 @@ local netSuccess = pcall(function()
 end)
 
 if not netSuccess or not net then
-    warn("[DennHub] Failed to load net remotes")
+    warn("[Denmas Hub] Failed to load net remotes")
     return
 end
 ```
@@ -69,13 +69,13 @@ ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
 ```lua
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "DennHubUI"
+ScreenGui.Name = "Denmas HubUI"
 ScreenGui.DisplayOrder = 999  -- Always visible
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5)
 
 if not ScreenGui.Parent then
-    warn("[DennHub] Failed to create ScreenGui")
+    warn("[Denmas Hub] Failed to create ScreenGui")
     return
 end
 ```
@@ -103,13 +103,13 @@ local RodIdle = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Animatio
 ```lua
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 if not character then
-    warn("[DennHub] Failed to get character")
+    warn("[Denmas Hub] Failed to get character")
     return
 end
 
 local humanoid = character:WaitForChild("Humanoid", 5)
 if not humanoid then
-    warn("[DennHub] Failed to get humanoid")
+    warn("[Denmas Hub] Failed to get humanoid")
     return
 end
 
@@ -123,7 +123,7 @@ local animSuccess = pcall(function()
 end)
 
 if not animSuccess or not (RodIdle and RodReel and RodShake) then
-    warn("[DennHub] Failed to load animations")
+    warn("[Denmas Hub] Failed to load animations")
     return
 end
 ```
@@ -144,7 +144,7 @@ function StartAutoFish()
     if state.AutoFish then return end
 
     if not (rodRemote and miniGameRemote and finishRemote) then
-        warn("[DennHub] Remotes not available")
+        warn("[Denmas Hub] Remotes not available")
         return
     end
 
@@ -181,7 +181,7 @@ end
 ```lua
 local function TeleportToIsland(islandName)
     if not islandCoords[islandName] then
-        warn("[DennHub] Island not found: " .. tostring(islandName))
+        warn("[Denmas Hub] Island not found: " .. tostring(islandName))
         return
     end
 
@@ -190,7 +190,7 @@ local function TeleportToIsland(islandName)
         local charFolder = workspace:WaitForChild("Characters", 5)
         local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
         if not char then
-            warn("[DennHub] Character not found in workspace")
+            warn("[Denmas Hub] Character not found in workspace")
             return
         end
 
@@ -198,7 +198,7 @@ local function TeleportToIsland(islandName)
         if hrp then
             hrp.CFrame = CFrame.new(position + Vector3.new(0, 5, 0))
         else
-            warn("[DennHub] HumanoidRootPart not found")
+            warn("[Denmas Hub] HumanoidRootPart not found")
         end
     end)
 end

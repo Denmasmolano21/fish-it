@@ -1,4 +1,4 @@
-# DennHub - Fish It v2.1 Updates
+# Denmas Hub - Fish It v2.1 Updates
 
 ## ✨ Major Improvements
 
@@ -20,7 +20,7 @@
 
 ### 3. **Removed All Emojis**
 
-- Title: "DennHub - Fish It" (no emoji)
+- Title: "Denmas Hub - Fish It" (no emoji)
 - Tab names: "Auto Fishing", "Utility", "Settings" (no emojis)
 - Section titles now use plain text with descriptions
 - Cleaner, more professional look
@@ -97,14 +97,14 @@
 
 ## Visual Improvements
 
-| Element   | Before                | After               |
-| --------- | --------------------- | ------------------- |
-| Title     | "🎣 Denmas - Fish It" | "DennHub - Fish It" |
-| Tabs      | "🎣 Auto Fishing"     | "Auto Fishing"      |
-| Toggles   | ON/OFF text           | Switch animation    |
-| Buttons   | 40px height           | 45px height         |
-| Labels    | No background         | Styled background   |
-| Dropdowns | Basic style           | Modern with scroll  |
+| Element   | Before                | After                  |
+| --------- | --------------------- | ---------------------- |
+| Title     | "🎣 Denmas - Fish It" | "Denmas Hub - Fish It" |
+| Tabs      | "🎣 Auto Fishing"     | "Auto Fishing"         |
+| Toggles   | ON/OFF text           | Switch animation       |
+| Buttons   | 40px height           | 45px height            |
+| Labels    | No background         | Styled background      |
+| Dropdowns | Basic style           | Modern with scroll     |
 
 ## Version
 
