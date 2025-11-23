@@ -81,7 +81,7 @@ TitleCorner.CornerRadius = UDim.new(0, 12)
 
 local Title = Instance.new("TextLabel")
 Title.Parent = TitleBar
-Title.Text = "DennHub | Fish It v2.1"
+Title.Text = "Denmas | Fish It v2.1"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
 Title.BackgroundTransparency = 1
