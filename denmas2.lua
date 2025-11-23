@@ -94,7 +94,7 @@ Title.ZIndex = 2
 -- Close Button
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Parent = TitleBar
-CloseBtn.Text = "×"
+CloseBtn.Text = "X"
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 24
 CloseBtn.BackgroundColor3 = Color3.fromRGB(240, 80, 80)
@@ -140,11 +140,15 @@ ContentContainer.BorderSizePixel = 0
 ContentContainer.ClipsDescendants = true
 ContentContainer.ZIndex = 1
 
+print("[DEBUG] GUI Created - Sidebar and Content Container ready")
+
 -------------------------------------------
 ----- UI COMPONENT CREATORS
 -------------------------------------------
 
 local function CreateToggle(parent, text, defaultState, callback)
+    print("[DEBUG] Creating Toggle:", text)
+    
     local frame = Instance.new("Frame")
     frame.Name = "Toggle"
     frame.Parent = parent
@@ -210,6 +214,8 @@ local function CreateToggle(parent, text, defaultState, callback)
 end
 
 local function CreateButton(parent, text, callback)
+    print("[DEBUG] Creating Button:", text)
+    
     local btn = Instance.new("TextButton")
     btn.Name = "Button"
     btn.Parent = parent
@@ -238,6 +244,8 @@ local function CreateButton(parent, text, callback)
 end
 
 local function CreateLabel(parent, title, content)
+    print("[DEBUG] Creating Label:", title)
+    
     local frame = Instance.new("Frame")
     frame.Name = "Label"
     frame.Parent = parent
@@ -276,6 +284,8 @@ local function CreateLabel(parent, title, content)
 end
 
 local function CreateDropdown(parent, title, options, callback)
+    print("[DEBUG] Creating Dropdown:", title)
+    
     local selectedValue = options[1]
     
     local frame = Instance.new("Frame")
@@ -388,6 +398,8 @@ end
 local Pages = {}
 
 local function CreatePage(name)
+    print("[DEBUG] Creating Page:", name)
+    
     local page = Instance.new("ScrollingFrame")
     page.Name = name
     page.Parent = ContentContainer
@@ -423,6 +435,8 @@ end
 local PageAutoFishing = CreatePage("AutoFishing")
 local PageUtility = CreatePage("Utility")
 local PageSettings = CreatePage("Settings")
+
+print("[DEBUG] All pages created")
 
 -------------------------------------------
 ----- AUTO FISHING SYSTEM
@@ -630,6 +644,8 @@ end
 ----- POPULATE PAGES WITH CONTENT
 -------------------------------------------
 
+print("[DEBUG] Starting to populate pages...")
+
 -- AUTO FISHING PAGE
 CreateLabel(PageAutoFishing, "Auto Fishing", "Automated fishing with perfect cast")
 CreateToggle(PageAutoFishing, "Enable Auto Fish", false, function(value)
@@ -645,6 +661,8 @@ end)
 CreateButton(PageAutoFishing, "Stop Fishing", function()
     StopAutoFish()
 end)
+
+print("[DEBUG] Auto Fishing page populated")
 
 -- UTILITY PAGE
 CreateLabel(PageUtility, "Teleportation", "Travel to different islands")
@@ -710,6 +728,8 @@ CreateButton(PageUtility, "Server Hop", function()
     end)
 end)
 
+print("[DEBUG] Utility page populated")
+
 -- SETTINGS PAGE
 CreateLabel(PageSettings, "General Settings", "Configure preferences")
 CreateToggle(PageSettings, "Anti-AFK", true, function(value)
@@ -729,6 +749,8 @@ CreateToggle(PageSettings, "Anti-AFK", true, function(value)
 end)
 CreateLabel(PageSettings, "About", "DennHub Fish It v2.1 | @denmas._")
 
+print("[DEBUG] Settings page populated")
+
 -------------------------------------------
 ----- TAB BUTTONS & SWITCHING
 -------------------------------------------
@@ -736,6 +758,8 @@ CreateLabel(PageSettings, "About", "DennHub Fish It v2.1 | @denmas._")
 local selectedTab = nil
 
 local function CreateTabButton(name, icon, page)
+    print("[DEBUG] Creating Tab Button:", name)
+    
     local btn = Instance.new("TextButton")
     btn.Name = "Tab_" .. name
     btn.Parent = Sidebar
@@ -752,9 +776,12 @@ local function CreateTabButton(name, icon, page)
     corner.CornerRadius = UDim.new(0, 8)
     
     btn.MouseButton1Click:Connect(function()
+        print("[DEBUG] Tab clicked:", name)
+        
         -- Hide all pages
-        for _, p in pairs(Pages) do
+        for pageName, p in pairs(Pages) do
             p.Visible = false
+            print("[DEBUG] Hiding page:", pageName)
         end
         
         -- Reset all tab colors
@@ -767,6 +794,7 @@ local function CreateTabButton(name, icon, page)
         
         -- Show selected page
         page.Visible = true
+        print("[DEBUG] Showing page:", name)
         
         -- Highlight selected tab
         btn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
@@ -777,10 +805,12 @@ local function CreateTabButton(name, icon, page)
     return btn
 end
 
--- Create tab buttons
-local TabAutoFishing = CreateTabButton("Auto Fishing", "⚙", PageAutoFishing)
-local TabUtility = CreateTabButton("Utility", "🔧", PageUtility)
-local TabSettings = CreateTabButton("Settings", "⚡", PageSettings)
+-- Create tab buttons (FIXED EMOJI/ICONS)
+local TabAutoFishing = CreateTabButton("Auto Fishing", "[F]", PageAutoFishing)
+local TabUtility = CreateTabButton("Utility", "[U]", PageUtility)
+local TabSettings = CreateTabButton("Settings", "[S]", PageSettings)
+
+print("[DEBUG] All tabs created")
 
 -------------------------------------------
 ----- INITIALIZATION
@@ -808,3 +838,9 @@ TabAutoFishing.TextColor3 = Color3.fromRGB(255, 255, 255)
 selectedTab = TabAutoFishing
 
 print("[DennHub] Fish It v2.1 Loaded Successfully!")
+print("[DEBUG] First page should now be visible")
+
+-- Debug: Print all pages and their visibility
+for name, page in pairs(Pages) do
+    print("[DEBUG] Page:", name, "Visible:", page.Visible, "Children:", #page:GetChildren())
+end
