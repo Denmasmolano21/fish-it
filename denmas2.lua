@@ -7,32 +7,54 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
+local RunService = game:GetService("RunService")
 
--- Global Services
-local net = ReplicatedStorage:WaitForChild("Packages")
-	:WaitForChild("_Index")
-	:WaitForChild("sleitnick_net@0.2.0")
-	:WaitForChild("net")
+-- Verify script environment
+if not LocalPlayer then
+    warn("[DennHub] Script must be executed as LocalScript")
+    return
+end
+
+-- Global Services with timeout protection
+local net
+local netSuccess = pcall(function()
+    net = ReplicatedStorage:WaitForChild("Packages", 5)
+        :WaitForChild("_Index", 5)
+        :WaitForChild("sleitnick_net@0.2.0", 5)
+        :WaitForChild("net", 5)
+end)
+
+if not netSuccess or not net then
+    warn("[DennHub] Failed to load net remotes")
+    return
+end
 
 local state = {
-	AutoFish = false,
-	AutoSell = false,
-	AntiAFK = true
+    AutoFish = false,
+    AutoSell = false,
+    AntiAFK = true
 }
 
--- Remotes
-local rodRemote = net:WaitForChild("RF/ChargeFishingRod")
-local miniGameRemote = net:WaitForChild("RF/RequestFishingMinigameStarted")
-local finishRemote = net:WaitForChild("RE/FishingCompleted")
+-- Cache remotes with FindFirstChild fallback
+local rodRemote = net:FindFirstChild("RF/ChargeFishingRod")
+local miniGameRemote = net:FindFirstChild("RF/RequestFishingMinigameStarted")
+local finishRemote = net:FindFirstChild("RE/FishingCompleted")
 
 -------------------------------------------
 ----- =======[ MODERN UI ] =======
 -------------------------------------------
 
+-- Create ScreenGui with proper setup
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DennHubUI"
-ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.DisplayOrder = 999
 ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5)
+
+if not ScreenGui.Parent then
+    warn("[DennHub] Failed to create ScreenGui")
+    return
+end
 
 --// Main Window
 local MainFrame = Instance.new("Frame")
@@ -82,11 +104,22 @@ CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.Size = UDim2.new(0, 40, 0, 40)
 CloseBtn.Position = UDim2.new(1, -50, 0, 5)
+CloseBtn.BorderSizePixel = 0
 local CloseCorner = Instance.new("UICorner", CloseBtn)
 CloseCorner.CornerRadius = UDim.new(0, 6)
 
+-- Add hover effect to close button
+CloseBtn.MouseEnter:Connect(function()
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 70, 70)
+end)
+CloseBtn.MouseLeave:Connect(function()
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+end)
+
 CloseBtn.MouseButton1Click:Connect(function()
-	ScreenGui:Destroy()
+    if ScreenGui then
+        ScreenGui:Destroy()
+    end
 end)
 
 --// Tabs Bar
@@ -467,14 +500,33 @@ local BypassDelay = 0.5
 local PerfectCast = true
 local FishingActive = false
 
-local character = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
+-- Initialize character and animations with error handling
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+if not character then
+    warn("[DennHub] Failed to get character")
+    return
+end
+
+local humanoid = character:WaitForChild("Humanoid", 5)
+if not humanoid then
+    warn("[DennHub] Failed to get humanoid")
+    return
+end
+
 local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
 
--- Load animations
-local RodIdle = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Animations"):WaitForChild("FishingRodReelIdle")
-local RodReel = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Animations"):WaitForChild("EasyFishReelStart")
-local RodShake = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Animations"):WaitForChild("CastFromFullChargePosition1Hand")
+-- Load animations with timeout
+local RodIdle, RodReel, RodShake
+local animSuccess = pcall(function()
+    RodIdle = ReplicatedStorage:WaitForChild("Modules", 5):WaitForChild("Animations", 5):WaitForChild("FishingRodReelIdle", 5)
+    RodReel = ReplicatedStorage:WaitForChild("Modules", 5):WaitForChild("Animations", 5):WaitForChild("EasyFishReelStart", 5)
+    RodShake = ReplicatedStorage:WaitForChild("Modules", 5):WaitForChild("Animations", 5):WaitForChild("CastFromFullChargePosition1Hand", 5)
+end)
+
+if not animSuccess or not (RodIdle and RodReel and RodShake) then
+    warn("[DennHub] Failed to load animations")
+    return
+end
 
 local RodShakeAnim = animator:LoadAnimation(RodShake)
 local RodIdleAnim = animator:LoadAnimation(RodIdle)
@@ -528,25 +580,36 @@ end)
 function StartAutoFish()
     if state.AutoFish then return end
     
+    if not (rodRemote and miniGameRemote and finishRemote) then
+        warn("[DennHub] Remotes not available")
+        return
+    end
+    
     state.AutoFish = true
     updateDelayBasedOnRod()
     
     task.spawn(function()
         while state.AutoFish do
-            pcall(function()
+            local success = pcall(function()
                 FishingActive = true
 
-                local equipRemote = net:WaitForChild("RE/EquipToolFromHotbar")
-                equipRemote:FireServer(1)
-                task.wait(0.1)
+                local equipRemote = net:FindFirstChild("RE/EquipToolFromHotbar")
+                if equipRemote then
+                    equipRemote:FireServer(1)
+                    task.wait(0.1)
+                end
 
                 local chargeRemote = ReplicatedStorage
                     .Packages._Index["sleitnick_net@0.2.0"].net["RF/ChargeFishingRod"]
-                chargeRemote:InvokeServer(workspace:GetServerTimeNow())
-                task.wait(0.5)
+                if chargeRemote then
+                    chargeRemote:InvokeServer(workspace:GetServerTimeNow())
+                    task.wait(0.5)
+                end
 
                 local timestamp = workspace:GetServerTimeNow()
-                RodShakeAnim:Play()
+                if RodShakeAnim then
+                    RodShakeAnim:Play()
+                end
                 rodRemote:InvokeServer(timestamp)
 
                 local baseX, baseY = -0.7499996423721313, 1
@@ -559,12 +622,18 @@ function StartAutoFish()
                     y = math.random(0, 1000) / 1000
                 end
 
-                RodIdleAnim:Play()
+                if RodIdleAnim then
+                    RodIdleAnim:Play()
+                end
                 miniGameRemote:InvokeServer(x, y)
 
                 task.wait(customDelay)
                 FishingActive = false
             end)
+            
+            if not success then
+                task.wait(1)
+            end
         end
     end)
 end
@@ -573,9 +642,9 @@ function StopAutoFish()
     state.AutoFish = false
     FishingActive = false
     pcall(function()
-        RodIdleAnim:Stop()
-        RodShakeAnim:Stop()
-        RodReelAnim:Stop()
+        if RodIdleAnim then RodIdleAnim:Stop() end
+        if RodShakeAnim then RodShakeAnim:Stop() end
+        if RodReelAnim then RodReelAnim:Stop() end
     end)
 end
 
@@ -600,17 +669,26 @@ local islandCoords = {
 }
 
 local function TeleportToIsland(islandName)
+    if not islandCoords[islandName] then
+        warn("[DennHub] Island not found: " .. tostring(islandName))
+        return
+    end
+    
     pcall(function()
         local position = islandCoords[islandName]
-        if not position then return end
         
         local charFolder = workspace:WaitForChild("Characters", 5)
-        local char = charFolder:FindFirstChild(LocalPlayer.Name)
-        if not char then return end
+        local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
+        if not char then
+            warn("[DennHub] Character not found in workspace")
+            return
+        end
         
         local hrp = char:FindFirstChild("HumanoidRootPart")
         if hrp then
             hrp.CFrame = CFrame.new(position + Vector3.new(0, 5, 0))
+        else
+            warn("[DennHub] HumanoidRootPart not found")
         end
     end)
 end
@@ -658,37 +736,56 @@ CreateButton(PageUtility, "Rejoin Server", function()
 end)
 
 CreateButton(PageUtility, "Server Hop", function()
-    pcall(function()
-        local placeId = game.PlaceId
-        local servers = {}
-        local cursor = ""
-
-        repeat
-            local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
-            if cursor ~= "" then
-                url = url .. "&cursor=" .. cursor
+    task.spawn(function()
+        pcall(function()
+            local placeId = game.PlaceId
+            if not placeId then
+                warn("[DennHub] Invalid PlaceId")
+                return
             end
+            
+            local servers = {}
+            local cursor = ""
+            local attempts = 0
+            local maxAttempts = 3
 
-            local success, result = pcall(function()
-                return HttpService:JSONDecode(game:HttpGet(url))
-            end)
-
-            if success and result and result.data then
-                for _, server in pairs(result.data) do
-                    if server.playing < server.maxPlayers and server.id ~= game.JobId then
-                        table.insert(servers, server.id)
-                    end
+            repeat
+                if attempts >= maxAttempts then break end
+                attempts = attempts + 1
+                
+                local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
+                if cursor ~= "" then
+                    url = url .. "&cursor=" .. cursor
                 end
-                cursor = result.nextPageCursor or ""
-            else
-                break
-            end
-        until not cursor or #servers > 0
 
-        if #servers > 0 then
-            local targetServer = servers[math.random(1, #servers)]
-            TeleportService:TeleportToPlaceInstance(placeId, targetServer, LocalPlayer)
-        end
+                local success, result = pcall(function()
+                    return HttpService:JSONDecode(game:HttpGet(url))
+                end)
+
+                if success and result and result.data then
+                    for _, server in pairs(result.data) do
+                        if server.playing and server.maxPlayers then
+                            if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                                table.insert(servers, server.id)
+                            end
+                        end
+                    end
+                    cursor = result.nextPageCursor or ""
+                else
+                    warn("[DennHub] Failed to fetch servers: HTTP request error")
+                    cursor = ""
+                end
+                
+                task.wait(0.5)
+            until not cursor or #servers > 0
+
+            if #servers > 0 then
+                local targetServer = servers[math.random(1, #servers)]
+                TeleportService:TeleportToPlaceInstance(placeId, targetServer, LocalPlayer)
+            else
+                warn("[DennHub] No available servers found")
+            end
+        end)
     end)
 end)
 
@@ -698,13 +795,38 @@ CreateLabel(PageSettings, "General Settings", "Configure script behavior and pre
 CreateToggle(PageSettings, "Anti-AFK", function(value)
     state.AntiAFK = value
     if value then
-        for i,v in next, getconnections(LocalPlayer.Idled) do
-            v:Disable()
+        -- Disconnect idle connections to prevent AFK kick
+        local connections = getconnections(LocalPlayer.Idled)
+        if connections and #connections > 0 then
+            for _, connection in ipairs(connections) do
+                if connection and connection.Connected then
+                    pcall(function()
+                        connection:Disable()
+                    end)
+                end
+            end
         end
     end
 end)
 
 CreateLabel(PageSettings, "Script Information", "Version 2.1 - Modern Edition | Created by @denmas._")
+
+-- Cleanup on script stop/unload
+local cleanup = function()
+    StopAutoFish()
+    if ScreenGui then
+        ScreenGui:Destroy()
+    end
+end
+
+-- Handle script cleanup
+game:BindToClose(cleanup)
+
+-- Handle character respawn
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    StopAutoFish()
+end)
 
 task.wait(0.1)
 
