@@ -9,13 +9,12 @@ local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
 
--- Verify script environment
 if not LocalPlayer then
     warn("[DennHub] Script must be executed as LocalScript")
     return
 end
 
--- Global Services with timeout protection
+-- Global Services
 local net
 local netSuccess = pcall(function()
     net = ReplicatedStorage:WaitForChild("Packages", 5)
@@ -44,7 +43,6 @@ local finishRemote = net:FindFirstChild("RE/FishingCompleted")
 ----- MODERN UI SYSTEM
 -------------------------------------------
 
--- Create ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DennHubUI"
 ScreenGui.DisplayOrder = 999
@@ -58,6 +56,7 @@ end
 
 -- Main Window
 local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 23, 30)
 MainFrame.Size = UDim2.new(0, 650, 0, 480)
@@ -75,6 +74,7 @@ MainStroke.Thickness = 1
 
 -- Title Bar
 local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
 TitleBar.Parent = MainFrame
 TitleBar.BackgroundColor3 = Color3.fromRGB(25, 28, 35)
 TitleBar.Size = UDim2.new(1, 0, 0, 50)
@@ -85,7 +85,7 @@ TitleCorner.CornerRadius = UDim.new(0, 12)
 
 local Title = Instance.new("TextLabel")
 Title.Parent = TitleBar
-Title.Text = "Denmas | Fish It v2.1"
+Title.Text = "DennHub | Fish It v2.1"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
 Title.BackgroundTransparency = 1
@@ -113,8 +113,9 @@ CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- Tabs Container (Left Sidebar)
+-- Tabs Container
 local Tabs = Instance.new("Frame")
+Tabs.Name = "Tabs"
 Tabs.Parent = MainFrame
 Tabs.BackgroundColor3 = Color3.fromRGB(25, 28, 35)
 Tabs.Size = UDim2.new(0, 160, 1, -50)
@@ -131,31 +132,9 @@ TabPadding.PaddingTop = UDim.new(0, 10)
 
 local selectedTab = nil
 
--- Tab Button Creator
-local function CreateTabButton(name, icon)
-    local btn = Instance.new("TextButton")
-    btn.Parent = Tabs
-    btn.Text = icon .. " " .. name
-    btn.Size = UDim2.new(1, -16, 0, 40)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
-    btn.Font = Enum.Font.GothamSemibold
-    btn.TextSize = 14
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    btn.AutoButtonColor = false
-    btn.BorderSizePixel = 0
-    
-    local corner = Instance.new("UICorner", btn)
-    corner.CornerRadius = UDim.new(0, 8)
-    
-    return btn
-end
-
-local TabAutoFishing = CreateTabButton("Auto Fishing", "⚙️")
-local TabUtility = CreateTabButton("Utility", "🔧")
-local TabSettings = CreateTabButton("Settings", "⚡")
-
 -- Pages Container
 local Pages = Instance.new("Frame")
+Pages.Name = "Pages"
 Pages.Parent = MainFrame
 Pages.Size = UDim2.new(1, -160, 1, -50)
 Pages.Position = UDim2.new(0, 160, 0, 50)
@@ -163,84 +142,16 @@ Pages.BackgroundColor3 = Color3.fromRGB(20, 23, 30)
 Pages.BorderSizePixel = 0
 Pages.ClipsDescendants = true
 
--- Page Creator
-local function CreatePage()
-    local page = Instance.new("ScrollingFrame")
-    page.Parent = Pages
-    page.Size = UDim2.new(1, 0, 1, 0)
-    page.CanvasSize = UDim2.new(0, 0, 0, 0)
-    page.ScrollBarThickness = 6
-    page.BackgroundColor3 = Color3.fromRGB(20, 23, 30)
-    page.BorderSizePixel = 0
-    page.ScrollBarImageColor3 = Color3.fromRGB(60, 65, 80)
-    page.Visible = false
-    
-    local layout = Instance.new("UIListLayout", page)
-    layout.Padding = UDim.new(0, 12)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
-    end)
-    
-    local padding = Instance.new("UIPadding", page)
-    padding.PaddingLeft = UDim.new(0, 15)
-    padding.PaddingRight = UDim.new(0, 15)
-    padding.PaddingTop = UDim.new(0, 15)
-    padding.PaddingBottom = UDim.new(0, 15)
-    
-    return page
-end
-
-local PageAutoFishing = CreatePage()
-local PageUtility = CreatePage()
-local PageSettings = CreatePage()
-
--- Switch Tab Function
-local function SwitchTab(page, tabBtn)
-    -- Hide all pages
-    PageAutoFishing.Visible = false
-    PageUtility.Visible = false
-    PageSettings.Visible = false
-    
-    -- Reset all tab colors
-    TabAutoFishing.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
-    TabAutoFishing.TextColor3 = Color3.fromRGB(200, 200, 200)
-    TabUtility.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
-    TabUtility.TextColor3 = Color3.fromRGB(200, 200, 200)
-    TabSettings.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
-    TabSettings.TextColor3 = Color3.fromRGB(200, 200, 200)
-    
-    -- Show selected page
-    page.Visible = true
-    
-    -- Highlight selected tab
-    tabBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
-    tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    selectedTab = tabBtn
-end
-
-TabAutoFishing.MouseButton1Click:Connect(function() 
-    SwitchTab(PageAutoFishing, TabAutoFishing) 
-end)
-
-TabUtility.MouseButton1Click:Connect(function() 
-    SwitchTab(PageUtility, TabUtility) 
-end)
-
-TabSettings.MouseButton1Click:Connect(function() 
-    SwitchTab(PageSettings, TabSettings) 
-end)
-
 -------------------------------------------
------ UI COMPONENTS
+----- UI COMPONENT FUNCTIONS
 -------------------------------------------
 
 -- Create Toggle
-local function CreateToggle(parent, text, callback)
+local function CreateToggle(parent, text, defaultState, callback)
     local frame = Instance.new("Frame")
+    frame.Name = "Toggle_" .. text
     frame.Parent = parent
-    frame.Size = UDim2.new(1, 0, 0, 50)
+    frame.Size = UDim2.new(1, -30, 0, 50)
     frame.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
     frame.BorderSizePixel = 0
 
@@ -255,7 +166,7 @@ local function CreateToggle(parent, text, callback)
     label.TextSize = 14
     label.BackgroundTransparency = 1
     label.Position = UDim2.new(0, 15, 0, 0)
-    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.Size = UDim2.new(0.65, 0, 1, 0)
     label.TextXAlignment = Enum.TextXAlignment.Left
 
     local toggleFrame = Instance.new("Frame")
@@ -270,9 +181,9 @@ local function CreateToggle(parent, text, callback)
 
     local toggleBtn = Instance.new("Frame")
     toggleBtn.Parent = toggleFrame
-    toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+    toggleBtn.BackgroundColor3 = defaultState and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(200, 60, 60)
     toggleBtn.Size = UDim2.new(0, 24, 0, 24)
-    toggleBtn.Position = UDim2.new(0, 3, 0.5, -12)
+    toggleBtn.Position = defaultState and UDim2.new(1, -27, 0.5, -12) or UDim2.new(0, 3, 0.5, -12)
     toggleBtn.BorderSizePixel = 0
     
     local tbc = Instance.new("UICorner", toggleBtn)
@@ -284,7 +195,7 @@ local function CreateToggle(parent, text, callback)
     clickDetector.BackgroundTransparency = 1
     clickDetector.Text = ""
 
-    local state = false
+    local state = defaultState or false
 
     clickDetector.MouseButton1Click:Connect(function()
         state = not state
@@ -298,17 +209,18 @@ local function CreateToggle(parent, text, callback)
         callback(state)
     end)
     
-    return clickDetector
+    return frame
 end
 
 -- Create Button
 local function CreateButton(parent, text, callback)
     local btn = Instance.new("TextButton")
+    btn.Name = "Button_" .. text
     btn.Parent = parent
     btn.Text = text
     btn.Font = Enum.Font.GothamSemibold
     btn.TextSize = 14
-    btn.Size = UDim2.new(1, 0, 0, 45)
+    btn.Size = UDim2.new(1, -30, 0, 45)
     btn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.BorderSizePixel = 0
@@ -332,8 +244,9 @@ end
 -- Create Label
 local function CreateLabel(parent, title, content)
     local frame = Instance.new("Frame")
+    frame.Name = "Label_" .. title
     frame.Parent = parent
-    frame.Size = UDim2.new(1, 0, 0, 65)
+    frame.Size = UDim2.new(1, -30, 0, 65)
     frame.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
     frame.BorderSizePixel = 0
 
@@ -363,6 +276,8 @@ local function CreateLabel(parent, title, content)
     contentLabel.TextWrapped = true
     contentLabel.TextXAlignment = Enum.TextXAlignment.Left
     contentLabel.TextYAlignment = Enum.TextYAlignment.Top
+    
+    return frame
 end
 
 -- Create Dropdown
@@ -370,8 +285,9 @@ local function CreateDropdown(parent, title, options, callback)
     local selectedValue = options[1]
     
     local frame = Instance.new("Frame")
+    frame.Name = "Dropdown_" .. title
     frame.Parent = parent
-    frame.Size = UDim2.new(1, 0, 0, 50)
+    frame.Size = UDim2.new(1, -30, 0, 50)
     frame.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
     frame.BorderSizePixel = 0
 
@@ -386,7 +302,7 @@ local function CreateDropdown(parent, title, options, callback)
     label.TextSize = 14
     label.BackgroundTransparency = 1
     label.Position = UDim2.new(0, 15, 0, 0)
-    label.Size = UDim2.new(0.5, 0, 1, 0)
+    label.Size = UDim2.new(0.45, 0, 1, 0)
     label.TextXAlignment = Enum.TextXAlignment.Left
 
     local dropdownBtn = Instance.new("TextButton")
@@ -394,8 +310,8 @@ local function CreateDropdown(parent, title, options, callback)
     dropdownBtn.Text = selectedValue
     dropdownBtn.Font = Enum.Font.Gotham
     dropdownBtn.TextSize = 13
-    dropdownBtn.Size = UDim2.new(0, 180, 0, 35)
-    dropdownBtn.Position = UDim2.new(1, -190, 0.5, -17.5)
+    dropdownBtn.Size = UDim2.new(0, 200, 0, 35)
+    dropdownBtn.Position = UDim2.new(1, -210, 0.5, -17.5)
     dropdownBtn.BackgroundColor3 = Color3.fromRGB(40, 43, 50)
     dropdownBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
     dropdownBtn.BorderSizePixel = 0
@@ -467,7 +383,51 @@ local function CreateDropdown(parent, title, options, callback)
             isOpen = true
         end
     end)
+    
+    return frame
 end
+
+-------------------------------------------
+----- CREATE PAGES
+-------------------------------------------
+
+local function CreatePage(name)
+    local page = Instance.new("ScrollingFrame")
+    page.Name = name
+    page.Parent = Pages
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.Position = UDim2.new(0, 0, 0, 0)
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.ScrollBarThickness = 6
+    page.BackgroundColor3 = Color3.fromRGB(20, 23, 30)
+    page.BorderSizePixel = 0
+    page.ScrollBarImageColor3 = Color3.fromRGB(60, 65, 80)
+    page.Visible = false
+    page.ZIndex = 1
+    
+    local layout = Instance.new("UIListLayout", page)
+    layout.Padding = UDim.new(0, 12)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 30)
+    end)
+    
+    local padding = Instance.new("UIPadding", page)
+    padding.PaddingLeft = UDim.new(0, 15)
+    padding.PaddingRight = UDim.new(0, 15)
+    padding.PaddingTop = UDim.new(0, 15)
+    padding.PaddingBottom = UDim.new(0, 15)
+    
+    return page
+end
+
+local PageAutoFishing = CreatePage("PageAutoFishing")
+local PageUtility = CreatePage("PageUtility")
+local PageSettings = CreatePage("PageSettings")
+
+print("[DEBUG] Pages created:", PageAutoFishing, PageUtility, PageSettings)
 
 -------------------------------------------
 ----- AUTO FISHING SYSTEM
@@ -495,7 +455,6 @@ local BypassDelay = 0.5
 local PerfectCast = true
 local FishingActive = false
 
--- Initialize character and animations
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 if not character then
     warn("[DennHub] Failed to get character")
@@ -510,7 +469,6 @@ end
 
 local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
 
--- Load animations
 local RodIdle, RodReel, RodShake
 local animSuccess = pcall(function()
     RodIdle = ReplicatedStorage:WaitForChild("Modules", 5):WaitForChild("Animations", 5):WaitForChild("FishingRodReelIdle", 5)
@@ -529,12 +487,17 @@ local RodReelAnim = animator:LoadAnimation(RodReel)
 
 local function getValidRodName()
     local player = Players.LocalPlayer
-    local display = player.PlayerGui:WaitForChild("Backpack"):WaitForChild("Display")
+    local success, display = pcall(function()
+        return player.PlayerGui:WaitForChild("Backpack"):WaitForChild("Display")
+    end)
+    
+    if not success or not display then return nil end
+    
     for _, tile in ipairs(display:GetChildren()) do
-        local success, itemNamePath = pcall(function()
+        local success2, itemNamePath = pcall(function()
             return tile.Inner.Tags.ItemName
         end)
-        if success and itemNamePath and itemNamePath:IsA("TextLabel") then
+        if success2 and itemNamePath and itemNamePath:IsA("TextLabel") then
             local name = itemNamePath.Text
             if RodDelays[name] then
                 return name
@@ -689,29 +652,40 @@ local function TeleportToIsland(islandName)
 end
 
 -------------------------------------------
------ PAGE CONTENT
+----- ADD CONTENT TO PAGES
 -------------------------------------------
 
--- Auto Fishing Page
-CreateLabel(PageAutoFishing, "Auto Fishing", "Automated fishing system with perfect cast")
+print("[DEBUG] Adding content to PageAutoFishing...")
 
-CreateToggle(PageAutoFishing, "Enable Auto Fish", function(value)
+-- Auto Fishing Page Content
+CreateLabel(PageAutoFishing, "Auto Fishing", "Automated fishing system with perfect cast")
+print("[DEBUG] Label added to PageAutoFishing")
+
+CreateToggle(PageAutoFishing, "Enable Auto Fish", false, function(value)
+    print("[DEBUG] Auto Fish toggled:", value)
     if value then
         StartAutoFish()
     else
         StopAutoFish()
     end
 end)
+print("[DEBUG] Toggle added to PageAutoFishing")
 
-CreateToggle(PageAutoFishing, "Perfect Cast", function(value)
+CreateToggle(PageAutoFishing, "Perfect Cast", true, function(value)
     PerfectCast = value
+    print("[DEBUG] Perfect Cast:", value)
 end)
 
 CreateButton(PageAutoFishing, "Stop Fishing", function()
     StopAutoFish()
+    print("[DEBUG] Stop Fishing clicked")
 end)
 
--- Utility Page
+print("[DEBUG] PageAutoFishing content count:", #PageAutoFishing:GetChildren())
+
+-- Utility Page Content
+print("[DEBUG] Adding content to PageUtility...")
+
 CreateLabel(PageUtility, "Teleportation", "Travel to different islands")
 
 local islandNames = {}
@@ -720,8 +694,9 @@ for name, _ in pairs(islandCoords) do
 end
 table.sort(islandNames)
 
-CreateDropdown(PageUtility, "Island", islandNames, function(island)
+CreateDropdown(PageUtility, "Select Island", islandNames, function(island)
     TeleportToIsland(island)
+    print("[DEBUG] Teleporting to:", island)
 end)
 
 CreateLabel(PageUtility, "Server Management", "Manage your server connection")
@@ -784,10 +759,14 @@ CreateButton(PageUtility, "Server Hop", function()
     end)
 end)
 
--- Settings Page
+print("[DEBUG] PageUtility content count:", #PageUtility:GetChildren())
+
+-- Settings Page Content
+print("[DEBUG] Adding content to PageSettings...")
+
 CreateLabel(PageSettings, "General Settings", "Configure script preferences")
 
-CreateToggle(PageSettings, "Anti-AFK", function(value)
+CreateToggle(PageSettings, "Anti-AFK", true, function(value)
     state.AntiAFK = value
     if value then
         local connections = getconnections(LocalPlayer.Idled)
@@ -801,11 +780,85 @@ CreateToggle(PageSettings, "Anti-AFK", function(value)
             end
         end
     end
+    print("[DEBUG] Anti-AFK:", value)
 end)
 
 CreateLabel(PageSettings, "About", "DennHub Fish It v2.1 | Made by @denmas._")
 
--- Cleanup
+print("[DEBUG] PageSettings content count:", #PageSettings:GetChildren())
+
+-------------------------------------------
+----- TAB SYSTEM
+-------------------------------------------
+
+local function CreateTabButton(name, icon)
+    local btn = Instance.new("TextButton")
+    btn.Name = "Tab_" .. name
+    btn.Parent = Tabs
+    btn.Text = icon .. " " .. name
+    btn.Size = UDim2.new(1, -16, 0, 40)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 14
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.AutoButtonColor = false
+    btn.BorderSizePixel = 0
+    
+    local corner = Instance.new("UICorner", btn)
+    corner.CornerRadius = UDim.new(0, 8)
+    
+    return btn
+end
+
+local TabAutoFishing = CreateTabButton("Auto Fishing", "⚙")
+local TabUtility = CreateTabButton("Utility", "🔧")
+local TabSettings = CreateTabButton("Settings", "⚡")
+
+local function SwitchTab(page, tabBtn)
+    print("[DEBUG] Switching to tab:", page.Name)
+    
+    -- Hide all pages
+    for _, p in pairs(Pages:GetChildren()) do
+        if p:IsA("ScrollingFrame") then
+            p.Visible = false
+        end
+    end
+    
+    -- Reset all tab colors
+    for _, tab in pairs(Tabs:GetChildren()) do
+        if tab:IsA("TextButton") then
+            tab.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
+            tab.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+    end
+    
+    -- Show selected page
+    page.Visible = true
+    print("[DEBUG] Page visible:", page.Name, page.Visible)
+    print("[DEBUG] Page children count:", #page:GetChildren())
+    
+    -- Highlight selected tab
+    tabBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+    tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    selectedTab = tabBtn
+end
+
+TabAutoFishing.MouseButton1Click:Connect(function() 
+    SwitchTab(PageAutoFishing, TabAutoFishing) 
+end)
+
+TabUtility.MouseButton1Click:Connect(function() 
+    SwitchTab(PageUtility, TabUtility) 
+end)
+
+TabSettings.MouseButton1Click:Connect(function() 
+    SwitchTab(PageSettings, TabSettings) 
+end)
+
+-------------------------------------------
+----- CLEANUP & INITIALIZATION
+-------------------------------------------
+
 local cleanup = function()
     StopAutoFish()
     if ScreenGui then
@@ -821,7 +874,11 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 -- Initialize first tab
-task.wait(0.1)
+task.wait(0.2)
+print("[DEBUG] Initializing first tab...")
 SwitchTab(PageAutoFishing, TabAutoFishing)
 
 print("[DennHub] Fish It v2.1 Loaded Successfully!")
+print("[DEBUG] Final check - PageAutoFishing children:", #PageAutoFishing:GetChildren())
+print("[DEBUG] Final check - PageUtility children:", #PageUtility:GetChildren())
+print("[DEBUG] Final check - PageSettings children:", #PageSettings:GetChildren())
