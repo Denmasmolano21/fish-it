@@ -1,0 +1,12 @@
+local games = {
+    [121864768012064] = "https://raw.githubusercontent.com/Denmasmolano21/fish-it/refs/heads/main/denmas.lua",
+}
+
+local currentID = game.PlaceId
+local scriptURL = games[currentID]
+
+if scriptURL then
+    loadstring(game:HttpGet(scriptURL))()
+else
+    game.Players.LocalPlayer:Kick("Unsupported game. Please use this script in a supported game.")
+end
