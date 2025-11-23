@@ -30,7 +30,9 @@ end
 local state = {
     AutoFish = false,
     AutoSell = false,
-    AntiAFK = true
+    AutoFavourite = false,
+    AntiAFK = true,
+    FPSBoost = false
 }
 
 -- Cache remotes
@@ -38,8 +40,226 @@ local rodRemote = net:FindFirstChild("RF/ChargeFishingRod")
 local miniGameRemote = net:FindFirstChild("RF/RequestFishingMinigameStarted")
 local finishRemote = net:FindFirstChild("RE/FishingCompleted")
 
+-- Auto Reconnect system
+local TeleportState = TeleportService.OnTeleport:Connect(function(teleportState)
+    if teleportState == Enum.TeleportState.Failed then
+        task.wait(2)
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end
+end)
+
+-- Auto Sell configuration
+local lastSellTime = 0
+local AUTO_SELL_THRESHOLD = 60
+local AUTO_SELL_DELAY = 60
+
 -------------------------------------------
------ CREATE GUI
+----- AUTO FEATURE SYSTEMS
+-------------------------------------------
+
+-- Simple Notification System
+local function ShowNotification(title, message, duration)
+    local NotifGui = Instance.new("ScreenGui")
+    NotifGui.Name = "NotificationGui"
+    NotifGui.DisplayOrder = 1000
+    NotifGui.ResetOnSpawn = false
+    NotifGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5)
+
+    local NotifFrame = Instance.new("Frame")
+    NotifFrame.Name = "NotificationFrame"
+    NotifFrame.Parent = NotifGui
+    NotifFrame.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
+    NotifFrame.Size = UDim2.new(0, 300, 0, 80)
+    NotifFrame.Position = UDim2.new(0.5, -150, 0, 20)
+    NotifFrame.BorderSizePixel = 0
+
+    local corner = Instance.new("UICorner", NotifFrame)
+    corner.CornerRadius = UDim.new(0, 8)
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Parent = NotifFrame
+    titleLabel.Text = title
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 14
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Position = UDim2.new(0, 10, 0, 5)
+    titleLabel.Size = UDim2.new(1, -20, 0, 25)
+
+    local msgLabel = Instance.new("TextLabel")
+    msgLabel.Parent = NotifFrame
+    msgLabel.Text = message
+    msgLabel.Font = Enum.Font.Gotham
+    msgLabel.TextSize = 11
+    msgLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    msgLabel.BackgroundTransparency = 1
+    msgLabel.Position = UDim2.new(0, 10, 0, 30)
+    msgLabel.Size = UDim2.new(1, -20, 0, 40)
+    msgLabel.TextWrapped = true
+
+    task.delay(duration or 3, function()
+        if NotifGui then
+            NotifGui:Destroy()
+        end
+    end)
+end
+
+-- FPS Boost Function
+local function BoostFPS()
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 1
+        end
+    end
+
+    local Lighting = game:GetService("Lighting")
+    for _, effect in pairs(Lighting:GetChildren()) do
+        if effect:IsA("PostEffect") then
+            effect.Enabled = false
+        end
+    end
+
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 1e10
+
+    settings().Rendering.QualityLevel = "Level01"
+end
+
+-- Auto Sell Function
+local function startAutoSell()
+    task.spawn(function()
+        while state.AutoSell do
+            pcall(function()
+                if not Replion then return end
+                local DataReplion = Replion.Client:WaitReplion("Data")
+                local items = DataReplion and DataReplion:Get({"Inventory","Items"})
+                if type(items) ~= "table" then return end
+
+                -- Count non-favorited fish
+                local unfavoritedCount = 0
+                for _, item in ipairs(items) do
+                    if not item.Favorited then
+                        unfavoritedCount = unfavoritedCount + (item.Count or 1)
+                    end
+                end
+
+                -- Only sell if above threshold and delay passed
+                if unfavoritedCount >= AUTO_SELL_THRESHOLD and os.time() - lastSellTime >= AUTO_SELL_DELAY then
+                    local sellFunc = net:FindFirstChild("RF/SellAllItems")
+                    if sellFunc then
+                        task.spawn(sellFunc.InvokeServer, sellFunc)
+                        ShowNotification("Auto Sell", "Selling non-favorited fish...")
+                        lastSellTime = os.time()
+                    end
+                end
+            end)
+            task.wait(10)
+        end
+    end)
+end
+
+-- Auto Favorite Function
+local function startAutoFavourite()
+    task.spawn(function()
+        while state.AutoFavourite do
+            pcall(function()
+                if not Replion or not ItemUtility then return end
+                local DataReplion = Replion.Client:WaitReplion("Data")
+                local items = DataReplion and DataReplion:Get({"Inventory","Items"})
+                if type(items) ~= "table" then return end
+                
+                local allowedTiers = { ["Secret"] = true, ["Mythic"] = true, ["Legendary"] = true }
+                local count = 0
+                for _, item in ipairs(items) do
+                    local base = ItemUtility:GetItemData(item.Id)
+                    if base and base.Data and allowedTiers[base.Data.Tier] and not item.Favorited then
+                        item.Favorited = true
+                        count = count + 1
+                    end
+                end
+                if count > 0 then
+                    ShowNotification("Auto Favorite", "Favorited " .. count .. " valuable fish!")
+                end
+            end)
+            task.wait(5)
+        end
+    end)
+end
+
+-- Manual Sell All Fishes
+local function sellAllFishes()
+    local charFolder = workspace:FindFirstChild("Characters")
+    local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        ShowNotification("Error", "Character not found!")
+        return
+    end
+
+    task.spawn(function()
+        ShowNotification("Selling", "Selling all fish, please wait...")
+        task.wait(1)
+        local sellRemote = net:WaitForChild("RF/SellAllItems")
+        pcall(function()
+            sellRemote:InvokeServer()
+            ShowNotification("Success", "All fish sold!", 3)
+        end)
+    end)
+end
+
+-- Auto Enchant Rod
+local function autoEnchantRod()
+    local ENCHANT_POSITION = Vector3.new(3231, -1303, 1402)
+    local char = workspace:WaitForChild("Characters"):FindFirstChild(LocalPlayer.Name)
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    if not hrp then
+        ShowNotification("Error", "Failed to get character!")
+        return
+    end
+
+    task.spawn(function()
+        ShowNotification("Info", "Place Enchant Stone in slot 5 first!", 5)
+        task.wait(3)
+
+        local Player = game:GetService("Players").LocalPlayer
+        local slot5 = Player.PlayerGui.Backpack.Display:GetChildren()[10]
+
+        local itemName = slot5 and slot5:FindFirstChild("Inner") and slot5.Inner:FindFirstChild("Tags") and slot5.Inner.Tags:FindFirstChild("ItemName")
+
+        if not itemName or not itemName.Text:lower():find("enchant") then
+            ShowNotification("Error", "Slot 5 must have Enchant Stone!")
+            return
+        end
+
+        ShowNotification("Info", "Enchanting in progress...", 7)
+
+        local originalPosition = hrp.Position
+        task.wait(1)
+        hrp.CFrame = CFrame.new(ENCHANT_POSITION + Vector3.new(0, 5, 0))
+        task.wait(1.2)
+
+        local equipRod = net:WaitForChild("RE/EquipToolFromHotbar")
+        local activateEnchant = net:WaitForChild("RE/ActivateEnchantingAltar")
+
+        pcall(function()
+            equipRod:FireServer(5)
+            task.wait(0.5)
+            activateEnchant:FireServer()
+            task.wait(7)
+            ShowNotification("Success", "Rod enchanted!", 3)
+        end)
+
+        task.wait(0.9)
+        hrp.CFrame = CFrame.new(originalPosition + Vector3.new(0, 3, 0))
+    end)
+end
+
+-------------------------------------------
+----- CREATE GUI (OPTIMIZED)
 -------------------------------------------
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -140,20 +360,26 @@ ContentContainer.BorderSizePixel = 0
 ContentContainer.ClipsDescendants = true
 ContentContainer.ZIndex = 1
 
-print("[DEBUG] GUI Created - Sidebar and Content Container ready")
+-------------------------------------------
+----- UI COMPONENT CREATORS (OPTIMIZED)
+-------------------------------------------
 
--------------------------------------------
------ UI COMPONENT CREATORS
--------------------------------------------
+-- Pre-create reusable color values
+local COLOR_BG_DARK = Color3.fromRGB(30, 33, 40)
+local COLOR_BG_MEDIUM = Color3.fromRGB(40, 43, 50)
+local COLOR_TEXT_LIGHT = Color3.fromRGB(220, 220, 220)
+local COLOR_TEXT_MEDIUM = Color3.fromRGB(160, 160, 160)
+local COLOR_GREEN = Color3.fromRGB(80, 200, 120)
+local COLOR_RED = Color3.fromRGB(200, 60, 60)
+local COLOR_BLUE = Color3.fromRGB(50, 120, 220)
+local COLOR_BLUE_HOVER = Color3.fromRGB(60, 140, 240)
 
 local function CreateToggle(parent, text, defaultState, callback)
-    print("[DEBUG] Creating Toggle:", text)
-    
     local frame = Instance.new("Frame")
     frame.Name = "Toggle"
     frame.Parent = parent
     frame.Size = UDim2.new(1, -30, 0, 50)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
+    frame.BackgroundColor3 = COLOR_BG_DARK
     frame.BorderSizePixel = 0
 
     local corner = Instance.new("UICorner", frame)
@@ -163,7 +389,7 @@ local function CreateToggle(parent, text, defaultState, callback)
     label.Parent = frame
     label.Text = text
     label.Font = Enum.Font.Gotham
-    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.TextColor3 = COLOR_TEXT_LIGHT
     label.TextSize = 14
     label.BackgroundTransparency = 1
     label.Position = UDim2.new(0, 15, 0, 0)
@@ -172,7 +398,7 @@ local function CreateToggle(parent, text, defaultState, callback)
 
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Parent = frame
-    toggleFrame.BackgroundColor3 = Color3.fromRGB(40, 43, 50)
+    toggleFrame.BackgroundColor3 = COLOR_BG_MEDIUM
     toggleFrame.Size = UDim2.new(0, 60, 0, 30)
     toggleFrame.Position = UDim2.new(1, -70, 0.5, -15)
     toggleFrame.BorderSizePixel = 0
@@ -182,7 +408,7 @@ local function CreateToggle(parent, text, defaultState, callback)
 
     local toggleBtn = Instance.new("Frame")
     toggleBtn.Parent = toggleFrame
-    toggleBtn.BackgroundColor3 = defaultState and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(200, 60, 60)
+    toggleBtn.BackgroundColor3 = defaultState and COLOR_GREEN or COLOR_RED
     toggleBtn.Size = UDim2.new(0, 24, 0, 24)
     toggleBtn.Position = defaultState and UDim2.new(1, -27, 0.5, -12) or UDim2.new(0, 3, 0.5, -12)
     toggleBtn.BorderSizePixel = 0
@@ -200,13 +426,14 @@ local function CreateToggle(parent, text, defaultState, callback)
 
     clickDetector.MouseButton1Click:Connect(function()
         toggleState = not toggleState
-        if toggleState then
-            toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-            toggleBtn:TweenPosition(UDim2.new(1, -27, 0.5, -12), "Out", "Quad", 0.2, true)
-        else
-            toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-            toggleBtn:TweenPosition(UDim2.new(0, 3, 0.5, -12), "Out", "Quad", 0.2, true)
-        end
+        toggleBtn.BackgroundColor3 = toggleState and COLOR_GREEN or COLOR_RED
+        toggleBtn:TweenPosition(
+            toggleState and UDim2.new(1, -27, 0.5, -12) or UDim2.new(0, 3, 0.5, -12),
+            Enum.EasingDirection.Out,
+            Enum.EasingStyle.Quad,
+            0.2,
+            true
+        )
         callback(toggleState)
     end)
     
@@ -214,8 +441,6 @@ local function CreateToggle(parent, text, defaultState, callback)
 end
 
 local function CreateButton(parent, text, callback)
-    print("[DEBUG] Creating Button:", text)
-    
     local btn = Instance.new("TextButton")
     btn.Name = "Button"
     btn.Parent = parent
@@ -223,7 +448,7 @@ local function CreateButton(parent, text, callback)
     btn.Font = Enum.Font.GothamSemibold
     btn.TextSize = 14
     btn.Size = UDim2.new(1, -30, 0, 45)
-    btn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+    btn.BackgroundColor3 = COLOR_BLUE
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.BorderSizePixel = 0
 
@@ -231,26 +456,22 @@ local function CreateButton(parent, text, callback)
     corner.CornerRadius = UDim.new(0, 8)
 
     btn.MouseButton1Click:Connect(callback)
-    
     btn.MouseEnter:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(60, 140, 240)
+        btn.BackgroundColor3 = COLOR_BLUE_HOVER
     end)
-    
     btn.MouseLeave:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+        btn.BackgroundColor3 = COLOR_BLUE
     end)
     
     return btn
 end
 
 local function CreateLabel(parent, title, content)
-    print("[DEBUG] Creating Label:", title)
-    
     local frame = Instance.new("Frame")
     frame.Name = "Label"
     frame.Parent = parent
     frame.Size = UDim2.new(1, -30, 0, 65)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
+    frame.BackgroundColor3 = COLOR_BG_DARK
     frame.BorderSizePixel = 0
 
     local corner = Instance.new("UICorner", frame)
@@ -272,7 +493,7 @@ local function CreateLabel(parent, title, content)
     contentLabel.Text = content
     contentLabel.Font = Enum.Font.Gotham
     contentLabel.TextSize = 12
-    contentLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+    contentLabel.TextColor3 = COLOR_TEXT_MEDIUM
     contentLabel.BackgroundTransparency = 1
     contentLabel.Position = UDim2.new(0, 10, 0, 30)
     contentLabel.Size = UDim2.new(1, -20, 0, 28)
@@ -284,15 +505,13 @@ local function CreateLabel(parent, title, content)
 end
 
 local function CreateDropdown(parent, title, options, callback)
-    print("[DEBUG] Creating Dropdown:", title)
-    
     local selectedValue = options[1]
     
     local frame = Instance.new("Frame")
     frame.Name = "Dropdown"
     frame.Parent = parent
     frame.Size = UDim2.new(1, -30, 0, 50)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
+    frame.BackgroundColor3 = COLOR_BG_DARK
     frame.BorderSizePixel = 0
 
     local corner = Instance.new("UICorner", frame)
@@ -302,7 +521,7 @@ local function CreateDropdown(parent, title, options, callback)
     label.Parent = frame
     label.Text = title
     label.Font = Enum.Font.Gotham
-    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.TextColor3 = COLOR_TEXT_LIGHT
     label.TextSize = 14
     label.BackgroundTransparency = 1
     label.Position = UDim2.new(0, 15, 0, 0)
@@ -316,8 +535,8 @@ local function CreateDropdown(parent, title, options, callback)
     dropdownBtn.TextSize = 13
     dropdownBtn.Size = UDim2.new(0, 200, 0, 35)
     dropdownBtn.Position = UDim2.new(1, -210, 0.5, -17.5)
-    dropdownBtn.BackgroundColor3 = Color3.fromRGB(40, 43, 50)
-    dropdownBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    dropdownBtn.BackgroundColor3 = COLOR_BG_MEDIUM
+    dropdownBtn.TextColor3 = COLOR_TEXT_LIGHT
     dropdownBtn.BorderSizePixel = 0
     
     local dc = Instance.new("UICorner", dropdownBtn)
@@ -360,8 +579,8 @@ local function CreateDropdown(parent, title, options, callback)
                 optBtn.Font = Enum.Font.Gotham
                 optBtn.TextSize = 13
                 optBtn.Size = UDim2.new(1, 0, 0, 30)
-                optBtn.BackgroundColor3 = Color3.fromRGB(40, 43, 50)
-                optBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+                optBtn.BackgroundColor3 = COLOR_BG_MEDIUM
+                optBtn.TextColor3 = COLOR_TEXT_LIGHT
                 optBtn.BorderSizePixel = 0
                 optBtn.ZIndex = 11
 
@@ -376,11 +595,11 @@ local function CreateDropdown(parent, title, options, callback)
                 end)
 
                 optBtn.MouseEnter:Connect(function()
-                    optBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+                    optBtn.BackgroundColor3 = COLOR_BLUE
                 end)
 
                 optBtn.MouseLeave:Connect(function()
-                    optBtn.BackgroundColor3 = Color3.fromRGB(40, 43, 50)
+                    optBtn.BackgroundColor3 = COLOR_BG_MEDIUM
                 end)
             end
             
@@ -392,14 +611,12 @@ local function CreateDropdown(parent, title, options, callback)
 end
 
 -------------------------------------------
------ CREATE PAGES
+----- CREATE PAGES (LAZY LOADING)
 -------------------------------------------
 
 local Pages = {}
 
 local function CreatePage(name)
-    print("[DEBUG] Creating Page:", name)
-    
     local page = Instance.new("ScrollingFrame")
     page.Name = name
     page.Parent = ContentContainer
@@ -435,8 +652,6 @@ end
 local PageAutoFishing = CreatePage("AutoFishing")
 local PageUtility = CreatePage("Utility")
 local PageSettings = CreatePage("Settings")
-
-print("[DEBUG] All pages created")
 
 -------------------------------------------
 ----- AUTO FISHING SYSTEM
@@ -641,131 +856,223 @@ local function TeleportToIsland(islandName)
 end
 
 -------------------------------------------
------ POPULATE PAGES WITH CONTENT
+----- POPULATE PAGES (DEFERRED)
 -------------------------------------------
 
-print("[DEBUG] Starting to populate pages...")
-
--- AUTO FISHING PAGE
-CreateLabel(PageAutoFishing, "Auto Fishing", "Automated fishing with perfect cast")
-CreateToggle(PageAutoFishing, "Enable Auto Fish", false, function(value)
-    if value then
-        StartAutoFish()
-    else
+local function PopulateAutoFishing()
+    CreateLabel(PageAutoFishing, "Auto Fishing", "Automated fishing with perfect cast")
+    CreateToggle(PageAutoFishing, "Enable Auto Fish", false, function(value)
+        if value then
+            StartAutoFish()
+        else
+            StopAutoFish()
+        end
+    end)
+    CreateToggle(PageAutoFishing, "Perfect Cast", true, function(value)
+        PerfectCast = value
+    end)
+    CreateButton(PageAutoFishing, "Stop Fishing", function()
         StopAutoFish()
-    end
-end)
-CreateToggle(PageAutoFishing, "Perfect Cast", true, function(value)
-    PerfectCast = value
-end)
-CreateButton(PageAutoFishing, "Stop Fishing", function()
-    StopAutoFish()
-end)
+    end)
 
-print("[DEBUG] Auto Fishing page populated")
+    -- Auto Sell Section
+    CreateLabel(PageAutoFishing, "Auto Sell", "Automatically sells non-favorited fish")
+    CreateToggle(PageAutoFishing, "Auto Sell", false, function(value)
+        state.AutoSell = value
+        if value then
+            startAutoSell()
+        end
+    end)
+    CreateButton(PageAutoFishing, "Sell All Fishes", function()
+        sellAllFishes()
+    end)
 
--- UTILITY PAGE
-CreateLabel(PageUtility, "Teleportation", "Travel to different islands")
+    -- Auto Favorite Section
+    CreateLabel(PageAutoFishing, "Auto Favorite", "Protects valuable fish from selling")
+    CreateToggle(PageAutoFishing, "Auto Favorite", false, function(value)
+        state.AutoFavourite = value
+        if value then
+            startAutoFavourite()
+        end
+    end)
 
-local islandNames = {}
-for name, _ in pairs(islandCoords) do
-    table.insert(islandNames, name)
+    -- Manual Actions
+    CreateLabel(PageAutoFishing, "Manual Actions", "Additional fishing tools")
+    CreateButton(PageAutoFishing, "Auto Enchant Rod", function()
+        autoEnchantRod()
+    end)
 end
-table.sort(islandNames)
 
-CreateDropdown(PageUtility, "Select Island", islandNames, function(island)
-    TeleportToIsland(island)
-end)
+local function PopulateUtility()
+    CreateLabel(PageUtility, "Teleportation", "Travel to different islands")
 
-CreateLabel(PageUtility, "Server Management", "Manage your connection")
+    local islandNames = {}
+    for name, _ in pairs(islandCoords) do
+        table.insert(islandNames, name)
+    end
+    table.sort(islandNames)
 
-CreateButton(PageUtility, "Rejoin Server", function()
-    TeleportService:Teleport(game.PlaceId, LocalPlayer)
-end)
+    CreateDropdown(PageUtility, "Select Island", islandNames, function(island)
+        TeleportToIsland(island)
+    end)
 
-CreateButton(PageUtility, "Server Hop", function()
-    task.spawn(function()
-        pcall(function()
-            local placeId = game.PlaceId
-            local servers = {}
-            local cursor = ""
-            local attempts = 0
+    CreateLabel(PageUtility, "Server Management", "Manage your connection")
 
-            repeat
-                if attempts >= 3 then break end
-                attempts = attempts + 1
-                
-                local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
-                if cursor ~= "" then
-                    url = url .. "&cursor=" .. cursor
-                end
+    CreateButton(PageUtility, "Rejoin Server", function()
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end)
 
-                local success, result = pcall(function()
-                    return HttpService:JSONDecode(game:HttpGet(url))
-                end)
+    CreateButton(PageUtility, "Server Hop", function()
+        task.spawn(function()
+            pcall(function()
+                local placeId = game.PlaceId
+                local servers = {}
+                local cursor = ""
+                local attempts = 0
 
-                if success and result and result.data then
-                    for _, server in pairs(result.data) do
-                        if server.playing and server.maxPlayers then
-                            if server.playing < server.maxPlayers and server.id ~= game.JobId then
-                                table.insert(servers, server.id)
+                repeat
+                    if attempts >= 3 then break end
+                    attempts = attempts + 1
+                    
+                    local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
+                    if cursor ~= "" then
+                        url = url .. "&cursor=" .. cursor
+                    end
+
+                    local success, result = pcall(function()
+                        return HttpService:JSONDecode(game:HttpGet(url))
+                    end)
+
+                    if success and result and result.data then
+                        for _, server in pairs(result.data) do
+                            if server.playing and server.maxPlayers then
+                                if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                                    table.insert(servers, server.id)
+                                end
                             end
                         end
+                        cursor = result.nextPageCursor or ""
+                    else
+                        cursor = ""
                     end
-                    cursor = result.nextPageCursor or ""
-                else
-                    cursor = ""
-                end
-                
-                task.wait(0.5)
-            until not cursor or #servers > 0
+                    
+                    task.wait(0.5)
+                until not cursor or #servers > 0
 
-            if #servers > 0 then
-                local targetServer = servers[math.random(1, #servers)]
-                TeleportService:TeleportToPlaceInstance(placeId, targetServer, LocalPlayer)
-            end
+                if #servers > 0 then
+                    local targetServer = servers[math.random(1, #servers)]
+                    TeleportService:TeleportToPlaceInstance(placeId, targetServer, LocalPlayer)
+                end
+            end)
         end)
     end)
-end)
 
-print("[DEBUG] Utility page populated")
+    -- Event Teleport
+    CreateLabel(PageUtility, "Event Teleport", "Teleport to active events")
+    local eventsList = { "Shark Hunt", "Ghost Shark Hunt", "Worm Hunt", "Black Hole", "Shocked", "Ghost Worm", "Meteor Rain" }
+    
+    CreateDropdown(PageUtility, "Select Event", eventsList, function(option)
+        local props = workspace:FindFirstChild("Props")
+        if props and props:FindFirstChild(option) and props[option]:FindFirstChild("Fishing Boat") then
+            local fishingBoat = props[option]["Fishing Boat"]
+            local boatCFrame = fishingBoat:GetPivot()
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = boatCFrame + Vector3.new(0, 15, 0)
+            end
+        end
+    end)
 
--- SETTINGS PAGE
-CreateLabel(PageSettings, "General Settings", "Configure preferences")
-CreateToggle(PageSettings, "Anti-AFK", true, function(value)
-    state.AntiAFK = value
-    if value then
-        local connections = getconnections(LocalPlayer.Idled)
-        if connections and #connections > 0 then
-            for _, connection in ipairs(connections) do
-                if connection and connection.Connected then
-                    pcall(function()
-                        connection:Disable()
-                    end)
+    -- NPC Teleport
+    CreateLabel(PageUtility, "NPC Teleport", "Teleport to NPCs")
+    local npcFolder = pcall(function()
+        return game:GetService("ReplicatedStorage"):WaitForChild("NPC", 2)
+    end) and game:GetService("ReplicatedStorage"):FindFirstChild("NPC") or nil
+
+    if npcFolder then
+        local npcList = {}
+        for _, npc in pairs(npcFolder:GetChildren()) do
+            if npc:IsA("Model") then
+                local hrp = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+                if hrp then
+                    table.insert(npcList, npc.Name)
                 end
             end
         end
-    end
-end)
-CreateLabel(PageSettings, "About", "DennHub Fish It v2.1 | @denmas._")
 
-print("[DEBUG] Settings page populated")
+        if #npcList > 0 then
+            CreateDropdown(PageUtility, "Select NPC", npcList, function(selectedName)
+                local npc = npcFolder:FindFirstChild(selectedName)
+                if npc and npc:IsA("Model") then
+                    local hrp = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+                    if hrp then
+                        local charFolder = workspace:FindFirstChild("Characters", 5)
+                        local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
+                        if not char then return end
+                        local myHRP = char:FindFirstChild("HumanoidRootPart")
+                        if myHRP then
+                            myHRP.CFrame = hrp.CFrame + Vector3.new(0, 3, 0)
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end
+
+local function PopulateSettings()
+    CreateLabel(PageSettings, "General Settings", "Configure preferences")
+    CreateToggle(PageSettings, "Anti-AFK", true, function(value)
+        state.AntiAFK = value
+        if value then
+            local connections = getconnections(LocalPlayer.Idled)
+            if connections and #connections > 0 then
+                for _, connection in ipairs(connections) do
+                    if connection and connection.Connected then
+                        pcall(function()
+                            connection:Disable()
+                        end)
+                    end
+                end
+            end
+        end
+    end)
+
+    -- Performance Settings
+    CreateLabel(PageSettings, "Performance", "Optimize game performance")
+    CreateToggle(PageSettings, "FPS Boost", false, function(value)
+        state.FPSBoost = value
+        if value then
+            BoostFPS()
+        end
+    end)
+
+    -- About Section
+    CreateLabel(PageSettings, "About", "DennHub Fish It v2.1 | @denmas._")
+end
+                        end)
+                    end
+                end
+            end
+        end
+    end)
+    CreateLabel(PageSettings, "About", "DennHub Fish It v2.1 | @denmas._")
+end
 
 -------------------------------------------
------ TAB BUTTONS & SWITCHING
+----- TAB BUTTONS & SWITCHING (OPTIMIZED)
 -------------------------------------------
 
 local selectedTab = nil
+local pagePopulated = {}
 
-local function CreateTabButton(name, icon, page)
-    print("[DEBUG] Creating Tab Button:", name)
-    
+local function CreateTabButton(name, icon, page, populateFunc)
     local btn = Instance.new("TextButton")
     btn.Name = "Tab_" .. name
     btn.Parent = Sidebar
     btn.Text = icon .. " " .. name
     btn.Size = UDim2.new(1, -16, 0, 40)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
+    btn.BackgroundColor3 = COLOR_BG_DARK
     btn.Font = Enum.Font.GothamSemibold
     btn.TextSize = 14
     btn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -776,28 +1083,30 @@ local function CreateTabButton(name, icon, page)
     corner.CornerRadius = UDim.new(0, 8)
     
     btn.MouseButton1Click:Connect(function()
-        print("[DEBUG] Tab clicked:", name)
+        -- Lazy load page content
+        if not pagePopulated[name] then
+            populateFunc()
+            pagePopulated[name] = true
+        end
         
         -- Hide all pages
-        for pageName, p in pairs(Pages) do
+        for _, p in pairs(Pages) do
             p.Visible = false
-            print("[DEBUG] Hiding page:", pageName)
         end
         
         -- Reset all tab colors
         for _, tab in pairs(Sidebar:GetChildren()) do
             if tab:IsA("TextButton") then
-                tab.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
+                tab.BackgroundColor3 = COLOR_BG_DARK
                 tab.TextColor3 = Color3.fromRGB(200, 200, 200)
             end
         end
         
         -- Show selected page
         page.Visible = true
-        print("[DEBUG] Showing page:", name)
         
         -- Highlight selected tab
-        btn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+        btn.BackgroundColor3 = COLOR_BLUE
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         selectedTab = btn
     end)
@@ -805,12 +1114,10 @@ local function CreateTabButton(name, icon, page)
     return btn
 end
 
--- Create tab buttons (FIXED EMOJI/ICONS)
-local TabAutoFishing = CreateTabButton("Auto Fishing", "[F]", PageAutoFishing)
-local TabUtility = CreateTabButton("Utility", "[U]", PageUtility)
-local TabSettings = CreateTabButton("Settings", "[S]", PageSettings)
-
-print("[DEBUG] All tabs created")
+-- Create tab buttons with deferred population
+local TabAutoFishing = CreateTabButton("Auto Fishing", "[F]", PageAutoFishing, PopulateAutoFishing)
+local TabUtility = CreateTabButton("Utility", "[U]", PageUtility, PopulateUtility)
+local TabSettings = CreateTabButton("Settings", "[S]", PageSettings, PopulateSettings)
 
 -------------------------------------------
 ----- INITIALIZATION
@@ -830,17 +1137,15 @@ LocalPlayer.CharacterAdded:Connect(function()
     StopAutoFish()
 end)
 
--- Show first tab by default
-task.wait(0.1)
-PageAutoFishing.Visible = true
-TabAutoFishing.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
-TabAutoFishing.TextColor3 = Color3.fromRGB(255, 255, 255)
-selectedTab = TabAutoFishing
-
-print("[DennHub] Fish It v2.1 Loaded Successfully!")
-print("[DEBUG] First page should now be visible")
-
--- Debug: Print all pages and their visibility
-for name, page in pairs(Pages) do
-    print("[DEBUG] Page:", name, "Visible:", page.Visible, "Children:", #page:GetChildren())
-end
+-- Show first tab by default (populate immediately)
+task.defer(function()
+    PopulateAutoFishing()
+    pagePopulated["Auto Fishing"] = true
+    
+    PageAutoFishing.Visible = true
+    TabAutoFishing.BackgroundColor3 = COLOR_BLUE
+    TabAutoFishing.TextColor3 = Color3.fromRGB(255, 255, 255)
+    selectedTab = TabAutoFishing
+    
+    print("[DennHub] Fish It v2.1 Loaded Successfully!")
+end)
