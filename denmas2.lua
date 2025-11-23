@@ -63,7 +63,7 @@ TitleCorner.CornerRadius = UDim.new(0, 10)
 
 local Title = Instance.new("TextLabel")
 Title.Parent = TitleBar
-Title.Text = "🎣 DennHub - Fish It"
+Title.Text = "Denmas Developer | Fish It"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
 Title.BackgroundTransparency = 1
@@ -75,7 +75,7 @@ Title.TextXAlignment = Enum.TextXAlignment.Left
 -- Close Button
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Parent = TitleBar
-CloseBtn.Text = "✕"
+CloseBtn.Text = "X"
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 18
 CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
@@ -136,16 +136,17 @@ local function CreateTabButton(name)
     return btn
 end
 
-local TabAutoFishing = CreateTabButton("🎣 Auto Fishing")
-local TabUtility = CreateTabButton("🗺️ Utility")
-local TabSettings = CreateTabButton("⚙️ Settings")
+local TabAutoFishing = CreateTabButton("Auto Fishing")
+local TabUtility = CreateTabButton("Utility")
+local TabSettings = CreateTabButton("Settings")
 
 --// Pages Container
 local Pages = Instance.new("Frame")
 Pages.Parent = MainFrame
 Pages.Size = UDim2.new(1, -150, 1, -50)
 Pages.Position = UDim2.new(0, 150, 0, 50)
-Pages.BackgroundTransparency = 1
+Pages.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+Pages.BorderSizePixel = 0
 
 --// Function to create page
 local function CreatePage()
@@ -153,20 +154,30 @@ local function CreatePage()
     page.Parent = Pages
     page.Size = UDim2.new(1, 0, 1, 0)
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
-    page.ScrollBarThickness = 5
+    page.ScrollBarThickness = 6
     page.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
     page.BorderSizePixel = 0
+    page.TopImage = ""
+    page.BottomImage = ""
+    page.MidImage = ""
     
     local layout = Instance.new("UIListLayout", page)
-    layout.Padding = UDim.new(0, 10)
+    layout.Padding = UDim.new(0, 12)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.FillDirection = Enum.FillDirection.Vertical
     layout.FillDirection = Enum.FillDirection.Vertical
     
     layout.Changed:Connect(function(prop)
         if prop == "AbsoluteContentSize" then
-            page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+            page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
         end
     end)
+    
+    local padding = Instance.new("UIPadding", page)
+    padding.PaddingLeft = UDim.new(0, 12)
+    padding.PaddingRight = UDim.new(0, 12)
+    padding.PaddingTop = UDim.new(0, 12)
+    padding.PaddingBottom = UDim.new(0, 12)
     
     return page
 end
@@ -203,43 +214,54 @@ TabSettings.MouseButton1Click:Connect(function() SwitchTab(PageSettings, TabSett
 local function CreateToggle(parent, text, callback)
     local frame = Instance.new("Frame")
     frame.Parent = parent
-    frame.Size = UDim2.new(1, -20, 0, 45)
-    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    frame.Size = UDim2.new(1, 0, 0, 50)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     frame.BorderSizePixel = 0
 
     local corner = Instance.new("UICorner", frame)
-    corner.CornerRadius = UDim.new(0, 8)
+    corner.CornerRadius = UDim.new(0, 6)
 
     local label = Instance.new("TextLabel")
     label.Parent = frame
     label.Text = text
     label.Font = Enum.Font.Gotham
-    label.TextColor3 = Color3.fromRGB(230, 230, 230)
-    label.TextSize = 14
+    label.TextColor3 = Color3.fromRGB(235, 235, 235)
+    label.TextSize = 15
     label.BackgroundTransparency = 1
-    label.Position = UDim2.new(0, 12, 0, 0)
+    label.Position = UDim2.new(0, 14, 0, 0)
     label.Size = UDim2.new(0.65, 0, 1, 0)
     label.TextXAlignment = Enum.TextXAlignment.Left
 
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Parent = frame
+    toggleFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    toggleFrame.Size = UDim2.new(0, 60, 0, 30)
+    toggleFrame.Position = UDim2.new(1, -74, 0.1, 0)
+    toggleFrame.BorderSizePixel = 0
+    local tc = Instance.new("UICorner", toggleFrame)
+    tc.CornerRadius = UDim.new(0, 15)
+
     local toggleBtn = Instance.new("TextButton")
-    toggleBtn.Parent = frame
-    toggleBtn.Text = "OFF"
-    toggleBtn.Font = Enum.Font.GothamBold
-    toggleBtn.TextSize = 13
-    toggleBtn.Size = UDim2.new(0, 55, 0, 28)
-    toggleBtn.Position = UDim2.new(1, -65, 0.15, 0)
-    toggleBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
-    toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleBtn.Parent = toggleFrame
+    toggleBtn.Text = ""
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+    toggleBtn.Size = UDim2.new(0, 26, 0, 26)
+    toggleBtn.Position = UDim2.new(0, 2, 0.2, 0)
     toggleBtn.BorderSizePixel = 0
-    local c = Instance.new("UICorner", toggleBtn)
-    c.CornerRadius = UDim.new(0, 5)
+    local tbc = Instance.new("UICorner", toggleBtn)
+    tbc.CornerRadius = UDim.new(0, 13)
 
     local state = false
 
     toggleBtn.MouseButton1Click:Connect(function()
         state = not state
-        toggleBtn.Text = state and "ON" or "OFF"
-        toggleBtn.BackgroundColor3 = state and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(100, 0, 0)
+        if state then
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+            toggleBtn.Position = UDim2.new(0, 32, 0.2, 0)
+        else
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+            toggleBtn.Position = UDim2.new(0, 2, 0.2, 0)
+        end
         callback(state)
     end)
     
@@ -250,28 +272,28 @@ end
 local function CreateButton(parent, text, callback)
     local frame = Instance.new("Frame")
     frame.Parent = parent
-    frame.Size = UDim2.new(1, -20, 0, 40)
-    frame.BackgroundColor3 = Color3.fromRGB(40, 100, 200)
+    frame.Size = UDim2.new(1, 0, 0, 45)
+    frame.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
     frame.BorderSizePixel = 0
 
     local corner = Instance.new("UICorner", frame)
-    corner.CornerRadius = UDim.new(0, 6)
+    corner.CornerRadius = UDim.new(0, 8)
 
     local btn = Instance.new("TextButton")
     btn.Parent = frame
     btn.Text = text
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
+    btn.TextSize = 15
     btn.Size = UDim2.new(1, 0, 1, 0)
     btn.BackgroundTransparency = 1
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 
     btn.MouseButton1Click:Connect(callback)
     btn.MouseEnter:Connect(function()
-        frame.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+        frame.BackgroundColor3 = Color3.fromRGB(60, 130, 230)
     end)
     btn.MouseLeave:Connect(function()
-        frame.BackgroundColor3 = Color3.fromRGB(40, 100, 200)
+        frame.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
     end)
 end
 
@@ -279,17 +301,22 @@ end
 local function CreateLabel(parent, title, content)
     local frame = Instance.new("Frame")
     frame.Parent = parent
-    frame.Size = UDim2.new(1, -20, 0, auto)
-    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1, 0, 0, 65)
+    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    frame.BorderSizePixel = 0
+
+    local corner = Instance.new("UICorner", frame)
+    corner.CornerRadius = UDim.new(0, 6)
 
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Parent = frame
     titleLabel.Text = title
     titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 13
-    titleLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+    titleLabel.TextSize = 14
+    titleLabel.TextColor3 = Color3.fromRGB(220, 220, 255)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Size = UDim2.new(1, 0, 0, 20)
+    titleLabel.Size = UDim2.new(1, -20, 0, 25)
+    titleLabel.Position = UDim2.new(0, 10, 0, 8)
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
     local contentLabel = Instance.new("TextLabel")
@@ -299,10 +326,11 @@ local function CreateLabel(parent, title, content)
     contentLabel.TextSize = 12
     contentLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
     contentLabel.BackgroundTransparency = 1
-    contentLabel.Position = UDim2.new(0, 0, 0, 22)
-    contentLabel.Size = UDim2.new(1, 0, 0, 40)
+    contentLabel.Position = UDim2.new(0, 10, 0, 28)
+    contentLabel.Size = UDim2.new(1, -20, 0, 32)
     contentLabel.TextWrapped = true
     contentLabel.TextXAlignment = Enum.TextXAlignment.Left
+    contentLabel.TextYAlignment = Enum.TextYAlignment.Top
 end
 
 --// FUNCTION: create dropdown
@@ -311,21 +339,21 @@ local function CreateDropdown(parent, title, options, callback)
     
     local frame = Instance.new("Frame")
     frame.Parent = parent
-    frame.Size = UDim2.new(1, -20, 0, 45)
-    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    frame.Size = UDim2.new(1, 0, 0, 50)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     frame.BorderSizePixel = 0
 
     local corner = Instance.new("UICorner", frame)
-    corner.CornerRadius = UDim.new(0, 8)
+    corner.CornerRadius = UDim.new(0, 6)
 
     local label = Instance.new("TextLabel")
     label.Parent = frame
     label.Text = title
     label.Font = Enum.Font.Gotham
-    label.TextColor3 = Color3.fromRGB(230, 230, 230)
-    label.TextSize = 13
+    label.TextColor3 = Color3.fromRGB(235, 235, 235)
+    label.TextSize = 14
     label.BackgroundTransparency = 1
-    label.Position = UDim2.new(0, 12, 0, 0)
+    label.Position = UDim2.new(0, 14, 0, 5)
     label.Size = UDim2.new(0.6, 0, 0.5, 0)
     label.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -333,10 +361,10 @@ local function CreateDropdown(parent, title, options, callback)
     dropdownBtn.Parent = frame
     dropdownBtn.Text = selectedValue
     dropdownBtn.Font = Enum.Font.Gotham
-    dropdownBtn.TextSize = 12
-    dropdownBtn.Size = UDim2.new(0, 100, 0, 28)
-    dropdownBtn.Position = UDim2.new(1, -110, 0.15, 0)
-    dropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    dropdownBtn.TextSize = 13
+    dropdownBtn.Size = UDim2.new(0, 110, 0, 32)
+    dropdownBtn.Position = UDim2.new(1, -124, 0.08, 0)
+    dropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
     dropdownBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
     dropdownBtn.BorderSizePixel = 0
     local dc = Instance.new("UICorner", dropdownBtn)
@@ -352,28 +380,37 @@ local function CreateDropdown(parent, title, options, callback)
         else
             dropList = Instance.new("Frame")
             dropList.Parent = dropdownBtn
-            dropList.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-            dropList.Size = UDim2.new(1, 0, 0, #options * 25)
+            dropList.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            dropList.Size = UDim2.new(1, 0, 0, math.min(#options * 28, 150))
             dropList.Position = UDim2.new(0, 0, 1, 2)
             dropList.BorderSizePixel = 0
+            dropList.ZIndex = 10
             local dlc = Instance.new("UICorner", dropList)
             dlc.CornerRadius = UDim.new(0, 4)
 
-            local dlLayout = Instance.new("UIListLayout", dropList)
-            dlLayout.Padding = UDim.new(0, 2)
+            local dlScroll = Instance.new("ScrollingFrame", dropList)
+            dlScroll.Size = UDim2.new(1, 0, 1, 0)
+            dlScroll.BackgroundTransparency = 1
+            dlScroll.ScrollBarThickness = 3
+            dlScroll.CanvasSize = UDim2.new(0, 0, 0, #options * 28)
+            dlScroll.TopImage = ""
+            dlScroll.BottomImage = ""
+            dlScroll.MidImage = ""
+
+            local dlLayout = Instance.new("UIListLayout", dlScroll)
+            dlLayout.Padding = UDim.new(0, 0)
 
             for _, option in ipairs(options) do
                 local optBtn = Instance.new("TextButton")
-                optBtn.Parent = dropList
+                optBtn.Parent = dlScroll
                 optBtn.Text = option
                 optBtn.Font = Enum.Font.Gotham
-                optBtn.TextSize = 11
-                optBtn.Size = UDim2.new(1, -4, 0, 22)
+                optBtn.TextSize = 12
+                optBtn.Size = UDim2.new(1, 0, 0, 28)
                 optBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-                optBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+                optBtn.TextColor3 = Color3.fromRGB(210, 210, 210)
                 optBtn.BorderSizePixel = 0
-                local oc = Instance.new("UICorner", optBtn)
-                oc.CornerRadius = UDim.new(0, 3)
+                optBtn.ZIndex = 11
 
                 optBtn.MouseButton1Click:Connect(function()
                     selectedValue = option
@@ -381,6 +418,14 @@ local function CreateDropdown(parent, title, options, callback)
                     callback(selectedValue)
                     dropList:Destroy()
                     isOpen = false
+                end)
+
+                optBtn.MouseEnter:Connect(function()
+                    optBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                end)
+
+                optBtn.MouseLeave:Connect(function()
+                    optBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
                 end)
             end
 
@@ -568,7 +613,8 @@ end
 -------------------------------------------
 
 -- Auto Fishing Section
-CreateLabel(PageAutoFishing, "🎣 Auto Fishing Controls", "Advanced automated fishing system")
+CreateLabel(PageAutoFishing, "Auto Fishing Controls", "Advanced automated fishing system with rod detection and perfect cast support")
+
 CreateToggle(PageAutoFishing, "Auto Fish V2", function(value)
     if value then
         StartAutoFish()
@@ -586,7 +632,7 @@ CreateButton(PageAutoFishing, "Stop All Fishing", function()
 end)
 
 -- Utility Section
-CreateLabel(PageUtility, "🗺️ Island Teleport", "Quick travel between islands")
+CreateLabel(PageUtility, "Island Teleportation", "Quickly travel between different islands and locations")
 
 local islandNames = {}
 for name, _ in pairs(islandCoords) do
@@ -597,6 +643,8 @@ table.sort(islandNames)
 CreateDropdown(PageUtility, "Select Island", islandNames, function(island)
     TeleportToIsland(island)
 end)
+
+CreateLabel(PageUtility, "Server Management", "Manage your connection and server experience")
 
 CreateButton(PageUtility, "Rejoin Server", function()
     TeleportService:Teleport(game.PlaceId, LocalPlayer)
@@ -638,9 +686,9 @@ CreateButton(PageUtility, "Server Hop", function()
 end)
 
 -- Settings Section
-CreateLabel(PageSettings, "⚙️ Script Settings", "Configure your experience")
+CreateLabel(PageSettings, "General Settings", "Configure script behavior and preferences")
 
-CreateToggle(PageSettings, "Anti AFK", function(value)
+CreateToggle(PageSettings, "Anti-AFK", function(value)
     state.AntiAFK = value
     if value then
         for i,v in next, getconnections(LocalPlayer.Idled) do
@@ -648,10 +696,10 @@ CreateToggle(PageSettings, "Anti AFK", function(value)
         end
     end
 end)
-
-CreateLabel(PageSettings, "📊 Script Info", "Version: 2.0 | Developer: @denmas._")
+    
+CreateLabel(PageSettings, "Script Information", "Version 2.1 - Modern Edition | Created by @denmas._")
 
 -- Initialize first tab
 SwitchTab(PageAutoFishing, TabAutoFishing)
 
-print("✅ DennHub - Fish It v2.0 Loaded Successfully!")
+print("[DennHub] Fish It v2.1 Loaded Successfully!")
