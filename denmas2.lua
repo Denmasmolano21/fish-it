@@ -1138,14 +1138,13 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 -- Show first tab by default (populate immediately)
-task.defer(function()
-    PopulateAutoFishing()
-    pagePopulated["Auto Fishing"] = true
-    
-    PageAutoFishing.Visible = true
-    TabAutoFishing.BackgroundColor3 = COLOR_BLUE
-    TabAutoFishing.TextColor3 = Color3.fromRGB(255, 255, 255)
-    selectedTab = TabAutoFishing
-    
-    print("[DennHub] Fish It v2.1 Loaded Successfully!")
-end)
+
+PopulateAutoFishing()
+pagePopulated["Auto Fishing"] = true
+
+PageAutoFishing.Visible = true
+TabAutoFishing.BackgroundColor3 = COLOR_BLUE
+TabAutoFishing.TextColor3 = Color3.fromRGB(255, 255, 255)
+selectedTab = TabAutoFishing
+
+print("[DennHub] Fish It v2.1 Loaded Successfully!")
