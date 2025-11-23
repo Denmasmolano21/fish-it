@@ -163,7 +163,7 @@ end
 local Window = WindUI:CreateWindow({
     Title = "DennHub - Fish It",
     Icon = "fish",
-    Author = "by @denmas",
+    Author = "by @denmas._",
     Folder = "DennHub",
     Size = UDim2.fromOffset(600, 450),
     Theme = "Indigo",
@@ -923,12 +923,12 @@ InfoSection:Paragraph({
 
 InfoSection:Label({
 	Title = "Version",
-	Content = "1.6.45"
+	Content = "1.0"
 })
 
 InfoSection:Label({
 	Title = "Developer",
-	Content = "@denmas"
+	Content = "@denmas._"
 })
 
 InfoSection:Label({
