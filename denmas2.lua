@@ -147,6 +147,10 @@ Pages.Size = UDim2.new(1, -150, 1, -50)
 Pages.Position = UDim2.new(0, 150, 0, 50)
 Pages.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
 Pages.BorderSizePixel = 0
+Pages.ClipsDescendants = true
+
+local PagesCorner = Instance.new("UICorner", Pages)
+PagesCorner.CornerRadius = UDim.new(0, 8)
 
 --// Function to create page
 local function CreatePage()
@@ -186,6 +190,8 @@ local PageAutoFishing = CreatePage()
 local PageUtility = CreatePage()
 local PageSettings = CreatePage()
 
+-- Make sure first page is visible by default
+PageAutoFishing.Visible = true
 PageUtility.Visible = false
 PageSettings.Visible = false
 
@@ -217,6 +223,7 @@ local function CreateToggle(parent, text, callback)
     frame.Size = UDim2.new(1, 0, 0, 50)
     frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     frame.BorderSizePixel = 0
+    frame.LayoutOrder = frame.Parent:FindFirstChildOfClass("UIListLayout") and (frame.Parent:FindFirstChildOfClass("UIListLayout").AbsoluteContentSize.Y / 50 + 1) or 1
 
     local corner = Instance.new("UICorner", frame)
     corner.CornerRadius = UDim.new(0, 6)
@@ -696,10 +703,14 @@ CreateToggle(PageSettings, "Anti-AFK", function(value)
         end
     end
 end)
-    
+
 CreateLabel(PageSettings, "Script Information", "Version 2.1 - Modern Edition | Created by @denmas._")
 
--- Initialize first tab
-SwitchTab(PageAutoFishing, TabAutoFishing)
+task.wait(0.1)
+
+-- Initialize first tab as visible AFTER all content is added
+PageAutoFishing.Visible = true
+TabAutoFishing.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+selectedTab = TabAutoFishing
 
 print("[DennHub] Fish It v2.1 Loaded Successfully!")
