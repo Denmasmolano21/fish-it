@@ -234,7 +234,7 @@ repeat
         end
         -- ...
     else
-        warn("[DennHub] Failed to fetch servers: HTTP request error")
+        warn("[Denmas Panel] Failed to fetch servers: HTTP request error")
         cursor = ""
     end
 
@@ -352,12 +352,12 @@ end)
 
 ## Debugging
 
-All functions now include `[DennHub]` prefix warnings for easy debugging:
+All functions now include `[Denmas Panel]` prefix warnings for easy debugging:
 
-- `[DennHub] Script must be executed as LocalScript`
-- `[DennHub] Failed to load net remotes`
-- `[DennHub] Failed to get character`
-- `[DennHub] Island not found: X`
+- `[Denmas Panel] Script must be executed as LocalScript`
+- `[Denmas Panel] Failed to load net remotes`
+- `[Denmas Panel] Failed to get character`
+- `[Denmas Panel] Island not found: X`
 - etc.
 
 ## Version

@@ -1,4 +1,4 @@
-# DennHub - Fish It v2.1 Final Fix
+# Denmas Panel - Fish It v2.1 Final Fix
 
 ## Issues Fixed
 

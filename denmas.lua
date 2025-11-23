@@ -917,7 +917,7 @@ local InfoSection = SettingsTab:Section({
 })
 
 InfoSection:Paragraph({
-	Title = "DennHub - Fish It",
+	Title = "Denmas Panel - Fish It",
 	Content = "Advanced fishing automation script with comprehensive features"
 })
 
@@ -937,7 +937,7 @@ InfoSection:Label({
 })
 
 WindUI:Notify({
-	Title = "DennHub - Fish It",
+	Title = "Denmas Panel - Fish It",
 	Content = "Script loaded successfully! Enjoy your fishing experience.",
 	Duration = 5,
 	Icon = "circle-check"

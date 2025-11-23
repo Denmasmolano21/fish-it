@@ -61,7 +61,7 @@ Your script has been improved following **Official Roblox API Best Practices** f
 
 ### 9. **Debugging** ✅
 
-- `[DennHub]` prefixed warning messages throughout
+- `[Denmas Panel]` prefixed warning messages throughout
 - Clear error identification
 - Easy troubleshooting
 

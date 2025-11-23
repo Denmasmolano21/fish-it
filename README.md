@@ -1,4 +1,4 @@
-# 🎣 DennHub – Fish It (Auto Fishing Script)
+# 🎣 Denmas Panel – Fish It (Auto Fishing Script)
 
 Script otomatis untuk memancing di game **Fish It** Roblox.  
 Dilengkapi Auto Fish V2, Auto Sell, Auto Favorite, dan UI modern berbasis WindUI.
@@ -20,31 +20,37 @@ Tekan **G** untuk membuka / menutup UI.
 ## ⚡ Fitur Utama
 
 ### 🎣 Auto Fishing V2
-- Perfect cast otomatis  
-- Auto reel & auto finish  
-- Delay otomatis sesuai rod  
+
+- Perfect cast otomatis
+- Auto reel & auto finish
+- Delay otomatis sesuai rod
 - Aman, cepat, dan stabil
 
 ### ⭐ Auto Favorite
+
 Menandai otomatis ikan:
-- Secret  
-- Mythic  
-- Legendary  
+
+- Secret
+- Mythic
+- Legendary
 
 Agar **tidak ikut terjual**.
 
 ### 💰 Auto Sell
+
 - Menjual ikan non-favorite otomatis
 - Threshold aman agar tidak ke-detect
 
 ### 🪄 Auto Enchant Rod
-- Hanya klik tombol  
+
+- Hanya klik tombol
 - Script otomatis enchant rod kamu
 
 ### 🧰 Utility
-- Anti AFK  
-- Auto Reconnect  
-- FPS Boost  
+
+- Anti AFK
+- Auto Reconnect
+- FPS Boost
 - UI modern & ringan (WindUI)
 
 ---
@@ -60,4 +66,5 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Denmasmolano21/fish-i
 ---
 
 ## 👤 Author
-**DennHub by @denmas**
+
+**Denmas Panel by @denmas**

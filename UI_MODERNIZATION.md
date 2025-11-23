@@ -1,4 +1,4 @@
-# DennHub - Modern UI Improvements
+# Denmas Panel - Modern UI Improvements
 
 ## Overview
 
@@ -19,7 +19,7 @@ Completely modernized the UI design of `denmas2.lua` with contemporary styling, 
 
 - **Height**: Increased from 50 to 65 pixels for better spacing
 - **Color**: Updated to gradient blue theme (RGB 20,28,45)
-- **Title**: Enhanced to "🎮 DennHub" with larger text (24→26pt)
+- **Title**: Enhanced to "🎮 Denmas Panel" with larger text (24→26pt)
 - **Accent Color**: Blue title text (RGB 100,180,255)
 - **Stroke**: Added matching blue border for cohesion
 

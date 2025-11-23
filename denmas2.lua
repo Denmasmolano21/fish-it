@@ -8,9 +8,10 @@ local LocalPlayer = Players.LocalPlayer
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
+local UserInputService = game:GetService("UserInputService")
 
 if not LocalPlayer then
-    warn("[DennHub] Script must be executed as LocalScript")
+    warn("[Denmas Hub] Script must be executed as LocalScript")
     return
 end
 
@@ -24,7 +25,7 @@ local netSuccess, netError = pcall(function()
 end)
 
 if not netSuccess or not net then
-    warn("[DennHub] Failed to load net remotes: " .. tostring(netError))
+    warn("[Denmas Hub] Failed to load net remotes: " .. tostring(netError))
     return
 end
 
@@ -43,11 +44,11 @@ local itemUtilSuccess = pcall(function()
 end)
 
 if not replionSuccess then
-    warn("[DennHub] Replion not loaded - Auto Sell/Favorite disabled")
+    warn("[Denmas Hub] Replion not loaded - Auto Sell/Favorite disabled")
 end
 
 if not itemUtilSuccess then
-    warn("[DennHub] ItemUtility not loaded - Auto Favorite disabled")
+    warn("[Denmas Hub] ItemUtility not loaded - Auto Favorite disabled")
 end
 
 local state = {
@@ -55,7 +56,8 @@ local state = {
     AutoSell = false,
     AutoFavourite = false,
     AntiAFK = false,
-    FPSBoost = false
+    FPSBoost = false,
+    FastFish = false
 }
 
 -- Cache remotes
@@ -126,7 +128,7 @@ local function ShowNotification(title, message, duration)
         end)
         
         if not success then
-            warn("[DennHub] Failed to show notification")
+            warn("[Denmas Hub] Failed to show notification")
         end
     end)
 end
@@ -135,7 +137,6 @@ end
 local function BoostFPS()
     task.spawn(function()
         local success = pcall(function()
-            -- Optimize workspace objects
             for _, v in pairs(workspace:GetDescendants()) do
                 if v:IsA("BasePart") then
                     v.Material = Enum.Material.SmoothPlastic
@@ -145,7 +146,6 @@ local function BoostFPS()
                 end
             end
 
-            -- Optimize lighting
             local Lighting = game:GetService("Lighting")
             for _, effect in pairs(Lighting:GetChildren()) do
                 if effect:IsA("PostEffect") then
@@ -155,8 +155,6 @@ local function BoostFPS()
 
             Lighting.GlobalShadows = false
             Lighting.FogEnd = 1e10
-
-            -- Set quality level
             settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
             
             ShowNotification("FPS Boost", "Performance optimized!", 2)
@@ -203,7 +201,6 @@ local function startAutoSell()
                 local items = DataReplion:Get({"Inventory","Items"})
                 if type(items) ~= "table" then return end
 
-                -- Count non-favorited fish
                 local unfavoritedCount = 0
                 for _, item in ipairs(items) do
                     if not item.Favorited then
@@ -211,7 +208,6 @@ local function startAutoSell()
                     end
                 end
 
-                -- Only sell if above threshold and delay passed
                 if unfavoritedCount >= AUTO_SELL_THRESHOLD and os.time() - lastSellTime >= AUTO_SELL_DELAY then
                     local sellFunc = net:FindFirstChild("RF/SellAllItems")
                     if sellFunc then
@@ -227,7 +223,7 @@ local function startAutoSell()
             end)
             
             if not success then
-                warn("[DennHub] Auto Sell error")
+                warn("[Denmas Hub] Auto Sell error")
             end
             
             task.wait(10)
@@ -271,7 +267,7 @@ local function startAutoFavourite()
             end)
             
             if not success then
-                warn("[DennHub] Auto Favorite error")
+                warn("[Denmas Hub] Auto Favorite error")
             end
             
             task.wait(5)
@@ -395,11 +391,11 @@ local function autoEnchantRod()
 end
 
 -------------------------------------------
------ CREATE GUI (OPTIMIZED)
+----- CREATE GUI (OPTIMIZED WITH RESIZE)
 -------------------------------------------
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "DennHubUI"
+ScreenGui.Name = "DenmasPanelUI"
 ScreenGui.DisplayOrder = 999
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5)
@@ -412,7 +408,6 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(20, 23, 30)
 MainFrame.Size = UDim2.new(0, 650, 0, 480)
 MainFrame.Position = UDim2.new(0.5, -325, 0.5, -240)
 MainFrame.Active = true
-MainFrame.Draggable = true
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 
@@ -437,15 +432,43 @@ TitleCorner.CornerRadius = UDim.new(0, 12)
 
 local Title = Instance.new("TextLabel")
 Title.Parent = TitleBar
-Title.Text = "Denmas | Fish It v2.1"
+Title.Text = "Denmas | Fish It v2.2"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
 Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(1, -120, 1, 0)
+Title.Size = UDim2.new(1, -140, 1, 0)
 Title.Position = UDim2.new(0, 20, 0, 0)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.ZIndex = 2
+
+-- Minimize Button
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Parent = TitleBar
+MinimizeBtn.Text = "_"
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 24
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(100, 120, 240)
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.Size = UDim2.new(0, 40, 0, 40)
+MinimizeBtn.Position = UDim2.new(1, -90, 0, 5)
+MinimizeBtn.BorderSizePixel = 0
+MinimizeBtn.ZIndex = 3
+
+local MinCorner = Instance.new("UICorner", MinimizeBtn)
+MinCorner.CornerRadius = UDim.new(0, 8)
+
+local isMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        MainFrame:TweenSize(UDim2.new(0, 650, 0, 50), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+        MinimizeBtn.Text = "+"
+    else
+        MainFrame:TweenSize(UDim2.new(0, 650, 0, 480), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+        MinimizeBtn.Text = "_"
+    end
+end)
 
 -- Close Button
 local CloseBtn = Instance.new("TextButton")
@@ -465,6 +488,84 @@ CloseCorner.CornerRadius = UDim.new(0, 8)
 
 CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
+end)
+
+-- Drag functionality for Title Bar
+local dragging = false
+local dragInput, mousePos, framePos
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        mousePos = input.Position
+        framePos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+TitleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - mousePos
+        MainFrame.Position = UDim2.new(
+            framePos.X.Scale,
+            framePos.X.Offset + delta.X,
+            framePos.Y.Scale,
+            framePos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Resize Handle
+local ResizeHandle = Instance.new("TextButton")
+ResizeHandle.Parent = MainFrame
+ResizeHandle.Text = "⬊"
+ResizeHandle.Font = Enum.Font.GothamBold
+ResizeHandle.TextSize = 16
+ResizeHandle.BackgroundColor3 = Color3.fromRGB(40, 43, 50)
+ResizeHandle.TextColor3 = Color3.fromRGB(150, 150, 150)
+ResizeHandle.Size = UDim2.new(0, 30, 0, 30)
+ResizeHandle.Position = UDim2.new(1, -30, 1, -30)
+ResizeHandle.BorderSizePixel = 0
+ResizeHandle.ZIndex = 10
+
+local RHCorner = Instance.new("UICorner", ResizeHandle)
+RHCorner.CornerRadius = UDim.new(0, 8)
+
+local resizing = false
+local resizeStart, startSize
+
+ResizeHandle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        resizing = true
+        resizeStart = input.Position
+        startSize = MainFrame.Size
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                resizing = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - resizeStart
+        local newWidth = math.max(500, startSize.X.Offset + delta.X)
+        local newHeight = math.max(400, startSize.Y.Offset + delta.Y)
+        MainFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
+    end
 end)
 
 -- Sidebar (Tabs Container)
@@ -883,7 +984,7 @@ function StartAutoFish()
     if state.AutoFish then return end
     
     if not (rodRemote and miniGameRemote and finishRemote) then
-        warn("[DennHub] Remotes not available")
+        warn("[Denmas Hub] Remotes not available")
         return
     end
     
@@ -971,7 +1072,7 @@ local islandCoords = {
 
 local function TeleportToIsland(islandName)
     if not islandCoords[islandName] then
-        warn("[DennHub] Island not found: " .. tostring(islandName))
+        warn("[Denmas Hub] Island not found: " .. tostring(islandName))
         return
     end
     
@@ -1003,7 +1104,7 @@ end
 -------------------------------------------
 
 local function PopulateAutoFishing()
-    CreateLabel(PageAutoFishing, "Auto Fishing", "Automated fishing with perfect cast")
+    -- CreateLabel(PageAutoFishing, "Auto Fishing", "Automated fishing with perfect cast")
     CreateToggle(PageAutoFishing, "Enable Auto Fish", false, function(value)
         if value then
             StartAutoFish()
@@ -1014,13 +1115,10 @@ local function PopulateAutoFishing()
     CreateToggle(PageAutoFishing, "Perfect Cast", true, function(value)
         PerfectCast = value
     end)
-    CreateButton(PageAutoFishing, "Stop Fishing", function()
-        StopAutoFish()
-    end)
 
     -- Auto Sell Section
     if Replion then
-        CreateLabel(PageAutoFishing, "Auto Sell", "Automatically sells non-favorited fish")
+        -- CreateLabel(PageAutoFishing, "Auto Sell", "Automatically sells non-favorited fish")
         CreateToggle(PageAutoFishing, "Auto Sell", false, function(value)
             state.AutoSell = value
             if value then
@@ -1034,7 +1132,7 @@ local function PopulateAutoFishing()
 
     -- Auto Favorite Section
     if Replion and ItemUtility then
-        CreateLabel(PageAutoFishing, "Auto Favorite", "Protects valuable fish from selling")
+        -- CreateLabel(PageAutoFishing, "Auto Favorite", "Protects valuable fish from selling")
         CreateToggle(PageAutoFishing, "Auto Favorite", false, function(value)
             state.AutoFavourite = value
             if value then
@@ -1044,7 +1142,7 @@ local function PopulateAutoFishing()
     end
 
     -- Manual Actions
-    CreateLabel(PageAutoFishing, "Manual Actions", "Additional fishing tools")
+    -- CreateLabel(PageAutoFishing, "Manual Actions", "Additional fishing tools")
     CreateButton(PageAutoFishing, "Auto Enchant Rod", function()
         autoEnchantRod()
     end)
@@ -1125,7 +1223,7 @@ local function PopulateUtility()
     end)
 
     -- Event Teleport
-    CreateLabel(PageUtility, "Event Teleport", "Teleport to active events")
+    -- CreateLabel(PageUtility, "Event Teleport", "Teleport to active events")
     local eventsList = { "Shark Hunt", "Ghost Shark Hunt", "Worm Hunt", "Black Hole", "Shocked", "Ghost Worm", "Meteor Rain" }
     
     CreateDropdown(PageUtility, "Select Event", eventsList, function(option)
@@ -1157,7 +1255,7 @@ local function PopulateUtility()
     end)
 
     -- NPC Teleport
-    CreateLabel(PageUtility, "NPC Teleport", "Teleport to NPCs")
+    -- CreateLabel(PageUtility, "NPC Teleport", "Teleport to NPCs")
     local success, npcFolder = pcall(function()
         return ReplicatedStorage:WaitForChild("NPC", 2)
     end)
@@ -1230,7 +1328,7 @@ local function PopulateSettings()
     end)
 
     -- Performance Settings
-    CreateLabel(PageSettings, "Performance", "Optimize game performance")
+    -- CreateLabel(PageSettings, "Performance", "Optimize game performance")
     CreateToggle(PageSettings, "FPS Boost", false, function(value)
         state.FPSBoost = value
         if value then
@@ -1347,6 +1445,6 @@ task.defer(function()
     TabAutoFishing.TextColor3 = Color3.fromRGB(255, 255, 255)
     selectedTab = TabAutoFishing
     
-    print("[DennHub] Fish It v2.1 Loaded Successfully!")
-    ShowNotification("DennHub", "Fish It v2.1 loaded successfully!", 3)
+    print("[Denmas Hub] Fish It v2.1 Loaded Successfully!")
+    ShowNotification("Denmas Hub", "Fish It v2.1 loaded successfully!", 3)
 end)

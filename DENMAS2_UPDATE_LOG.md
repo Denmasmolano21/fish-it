@@ -1,4 +1,4 @@
-# DennHub - Fish It v2.1 (denmas2.lua) - Update Log
+# Denmas Panel - Fish It v2.1 (denmas2.lua) - Update Log
 
 ## ✅ Fitur-Fitur yang Ditambahkan ke denmas2.lua
 
