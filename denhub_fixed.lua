@@ -77,7 +77,7 @@ local net = nil
 
 local function FindRemotes()
     local function findNetModule()
-        -- Try direct path first
+        -- Try Packages._Index first
         local p = ReplicatedStorage:FindFirstChild("Packages")
         if p then
             local idx = p:FindFirstChild("_Index")
@@ -85,7 +85,7 @@ local function FindRemotes()
                 for _, folder in ipairs(idx:GetChildren()) do
                     local netFolder = folder:FindFirstChild("net")
                     if netFolder then
-                        print("[DEN HUB] Found net in Packages._Index")
+                        print("[DEN HUB] Found net in Packages._Index." .. folder.Name)
                         return netFolder
                     end
                 end
@@ -99,10 +99,20 @@ local function FindRemotes()
             return direct
         end
         
-        -- Deep search
+        -- Check common locations
+        local modules = ReplicatedStorage:FindFirstChild("Modules")
+        if modules then
+            local modNet = modules:FindFirstChild("net")
+            if modNet then
+                print("[DEN HUB] Found net in Modules")
+                return modNet
+            end
+        end
+        
+        -- Deep search as last resort
         for _, v in pairs(ReplicatedStorage:GetDescendants()) do
             if v.Name == "net" and v:IsA("Folder") then
-                print("[DEN HUB] Found net via deep search")
+                print("[DEN HUB] Found net via deep search at: " .. v:GetFullName())
                 return v
             end
         end
@@ -113,22 +123,37 @@ local function FindRemotes()
     net = findNetModule()
     if not net then
         warn("[DEN HUB] Net module NOT found! Script may have limited functionality.")
+        print("[DEN HUB] ReplicatedStorage contents:")
+        for _, v in ipairs(ReplicatedStorage:GetChildren()) do
+            print("  - " .. v.Name .. " (" .. v.ClassName .. ")")
+        end
         return false
     end
     
     print("[DEN HUB] Net module found! Searching for remotes...")
     
+    -- List all remotes in net
+    print("[DEN HUB] Available in net:")
+    for _, v in ipairs(net:GetChildren()) do
+        print("  - " .. v.Name)
+    end
+    
     local remoteNames = {
+        "ChargeFishingRod",
+        "RequestFishingMinigameStarted",
+        "FishingCompleted",
+        "EquipToolFromHotbar",
+        "SellAllItems",
+        "ReplicateTextEffect",
+        "ActivateEnchantingAltar",
+        "Cast",
+        "Reel",
+        "Complete",
         "RF/ChargeFishingRod",
         "RF/RequestFishingMinigameStarted",
         "RE/FishingCompleted",
         "RE/EquipToolFromHotbar",
-        "RF/SellAllItems",
-        "RE/ReplicateTextEffect",
-        "RE/ActivateEnchantingAltar",
-        "RF/Cast",
-        "RF/Reel",
-        "RF/Complete"
+        "RF/SellAllItems"
     }
     
     local foundCount = 0
@@ -138,6 +163,17 @@ local function FindRemotes()
             Remotes[name] = remote
             print("[DEN HUB] ✓ Found: " .. name)
             foundCount = foundCount + 1
+        end
+    end
+    
+    if foundCount == 0 then
+        warn("[DEN HUB] No remotes found! Checking net structure...")
+        for _, child in ipairs(net:GetChildren()) do
+            if child:IsA("RemoteFunction") or child:IsA("RemoteEvent") then
+                print("[DEN HUB] Found remote: " .. child.Name .. " (" .. child.ClassName .. ")")
+                Remotes[child.Name] = child
+                foundCount = foundCount + 1
+            end
         end
     end
     
@@ -326,7 +362,7 @@ local function UpdateDelayBasedOnRod()
 end
 
 -- ═══════════════════════════════════════════════════════════
---                    AUTO FISHING SYSTEM (BLATANT)
+--                    AUTO FISHING SYSTEM (FIXED)
 -- ═══════════════════════════════════════════════════════════
 
 local function StartAutoFish()
@@ -340,9 +376,12 @@ local function StartAutoFish()
     
     -- Debug check
     if not net then
-        Notify("Error", "Net module not found!", 3)
-        State.AutoFish = false
-        return
+        Notify("Error", "Net module not found! Trying to find remotes...", 3)
+        FindRemotes()
+        if not net then
+            State.AutoFish = false
+            return
+        end
     end
     
     print("[DEN HUB] Starting AutoFish loop...")
@@ -354,13 +393,19 @@ local function StartAutoFish()
             loopCount = loopCount + 1
             
             SafePcall(function()
-                -- Check remotes exist
-                local chargeRemote = Remotes["RF/ChargeFishingRod"]
-                local reelRemote = Remotes["RF/RequestFishingMinigameStarted"]
+                -- Find the correct remotes
+                local chargeRemote = Remotes["RF/ChargeFishingRod"] or Remotes["ChargeFishingRod"]
+                local reelRemote = Remotes["RF/RequestFishingMinigameStarted"] or Remotes["RequestFishingMinigameStarted"]
+                local equipRemote = Remotes["RE/EquipToolFromHotbar"] or Remotes["EquipToolFromHotbar"]
                 
                 if not chargeRemote or not reelRemote then
-                    print("[DEN HUB] LOOP " .. loopCount .. ": Remotes missing!")
-                    Notify("Error", "Required remotes not found", 2)
+                    print("[DEN HUB] LOOP " .. loopCount .. ": Required remotes missing!")
+                    print("[DEN HUB] ChargeRemote: " .. tostring(chargeRemote))
+                    print("[DEN HUB] ReelRemote: " .. tostring(reelRemote))
+                    
+                    if loopCount == 1 then
+                        Notify("Error", "Required remotes not found. Check console.", 3)
+                    end
                     State.AutoFish = false
                     return
                 end
@@ -369,36 +414,52 @@ local function StartAutoFish()
                 State.FishingActive = true
                 
                 -- Step 1: Equip rod
-                if Remotes["RE/EquipToolFromHotbar"] then
-                    Remotes["RE/EquipToolFromHotbar"]:FireServer(1)
-                    task.wait(0.2)
+                if equipRemote then
+                    SafePcall(function()
+                        equipRemote:FireServer(1)
+                    end)
+                    task.wait(0.5)
                 end
                 
-                -- Step 2: Charge fishing rod (BLATANT)
+                -- Step 2: Charge fishing rod
                 local castSuccess, castResult = SafePcall(function()
-                    local result = chargeRemote:InvokeServer(workspace:GetServerTimeNow())
-                    print("[DEN HUB] LOOP " .. loopCount .. ": Charge result = " .. tostring(result))
-                    return result
+                    if chargeRemote:IsA("RemoteFunction") then
+                        -- Try different parameter styles
+                        local result = chargeRemote:InvokeServer()
+                        print("[DEN HUB] LOOP " .. loopCount .. ": Charge (no params) = " .. tostring(result))
+                        return result
+                    else
+                        chargeRemote:FireServer()
+                        return true
+                    end
                 end)
                 
-                task.wait(0.3)
+                task.wait(0.5)
                 
-                -- Step 3: Start minigame with BLATANT values
+                -- Step 3: Start minigame
                 local success, result = SafePcall(function()
-                    -- Try different coordinate approaches
-                    local approaches = {
-                        {x = 0, y = 0},           -- Center
-                        {x = -0.5, y = 1},        -- Original attempt
-                        {x = -0.75, y = 1},       -- Another attempt
-                        {x = -0.6, y = 0.9},      -- Slightly offset
-                    }
+                    print("[DEN HUB] LOOP " .. loopCount .. ": Starting minigame...")
                     
-                    local approach = approaches[(loopCount % #approaches) + 1]
-                    print("[DEN HUB] LOOP " .. loopCount .. ": Reeling with x=" .. approach.x .. " y=" .. approach.y)
-                    
-                    local res = reelRemote:InvokeServer(approach.x, approach.y)
-                    print("[DEN HUB] LOOP " .. loopCount .. ": Reel result = " .. tostring(res))
-                    return res
+                    if reelRemote:IsA("RemoteFunction") then
+                        -- Try invoking with various parameters
+                        local attempts = {
+                            function() return reelRemote:InvokeServer() end,
+                            function() return reelRemote:InvokeServer(0, 0) end,
+                            function() return reelRemote:InvokeServer(0.5, 0.5) end,
+                            function() return reelRemote:InvokeServer(Vector2.new(0, 0)) end,
+                        }
+                        
+                        for i, attemptFunc in ipairs(attempts) do
+                            local ok, res = pcall(attemptFunc)
+                            if ok then
+                                print("[DEN HUB] LOOP " .. loopCount .. ": Reel attempt " .. i .. " = " .. tostring(res))
+                                return res
+                            end
+                        end
+                    else
+                        reelRemote:FireServer()
+                        return true
+                    end
                 end)
                 
                 Stats.TotalCaught = Stats.TotalCaught + 1
@@ -575,7 +636,35 @@ SetupAntiAFK()
 
 local function TeleportToIsland(position)
     SafePcall(function()
-        HumanoidRootPart.CFrame = CFrame.new(position + Vector3.new(0, 5, 0))
+        -- Get fresh character reference
+        local char = LocalPlayer.Character
+        if not char then
+            Notify("Error", "Character not found!", 2)
+            return
+        end
+        
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            Notify("Error", "HumanoidRootPart not found!", 2)
+            return
+        end
+        
+        local targetPos = position + Vector3.new(0, 5, 0)
+        hrp.CFrame = CFrame.new(targetPos)
+        
+        print("[DEN HUB] Teleported to: " .. tostring(targetPos))
+        task.wait(0.5)
+        
+        -- Verify teleport worked
+        local newPos = hrp.Position
+        local distance = (newPos - targetPos).Magnitude
+        print("[DEN HUB] Actual position: " .. tostring(newPos) .. " | Distance: " .. distance)
+        
+        if distance < 10 then
+            Notify("Teleport", "Success!", 2)
+        else
+            Notify("Teleport", "Partial - may be blocked by anticheat", 2)
+        end
     end)
 end
 
@@ -583,6 +672,9 @@ local function ServerHop()
     SafePcall(function()
         local placeId = game.PlaceId
         local servers = {}
+        
+        print("[DEN HUB] Fetching servers list...")
+        Notify("Server Hop", "Finding servers...", 2)
         
         local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
         local response = HttpService:JSONDecode(game:HttpGet(url))
@@ -595,10 +687,14 @@ local function ServerHop()
             end
         end
         
+        print("[DEN HUB] Found " .. #servers .. " available servers")
+        
         if #servers > 0 then
             local randomServer = servers[math.random(1, #servers)]
+            print("[DEN HUB] Hopping to server: " .. randomServer)
+            Notify("Server Hop", "Hopping...", 3)
+            task.wait(1)
             TeleportService:TeleportToPlaceInstance(placeId, randomServer, LocalPlayer)
-            Notify("Server Hop", "Hopping to new server...", 3)
         else
             Notify("Server Hop", "No servers available", 3)
         end
@@ -607,6 +703,9 @@ end
 
 local function RejoinServer()
     SafePcall(function()
+        print("[DEN HUB] Rejoining server...")
+        Notify("Rejoin", "Reconnecting...", 3)
+        task.wait(1)
         TeleportService:Teleport(game.PlaceId, LocalPlayer)
     end)
 end
