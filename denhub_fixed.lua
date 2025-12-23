@@ -73,38 +73,50 @@ LoadRayfield()
 -- ═══════════════════════════════════════════════════════════
 
 local Remotes = {}
+local net = nil
 
 local function FindRemotes()
     local function findNetModule()
-        local candidates = {
-            function()
-                local p = ReplicatedStorage:FindFirstChild("Packages")
-                if not p then return nil end
-                local idx = p:FindFirstChild("_Index")
-                if not idx then return nil end
+        -- Try direct path first
+        local p = ReplicatedStorage:FindFirstChild("Packages")
+        if p then
+            local idx = p:FindFirstChild("_Index")
+            if idx then
                 for _, folder in ipairs(idx:GetChildren()) do
                     local netFolder = folder:FindFirstChild("net")
-                    if netFolder then return netFolder end
+                    if netFolder then
+                        print("[DEN HUB] Found net in Packages._Index")
+                        return netFolder
+                    end
                 end
-                return nil
-            end,
-            function()
-                return ReplicatedStorage:FindFirstChild("net")
-            end,
-        }
-        
-        for _, fn in ipairs(candidates) do
-            local ok, res = pcall(fn)
-            if ok and res then return res end
+            end
         end
+        
+        -- Try direct child
+        local direct = ReplicatedStorage:FindFirstChild("net")
+        if direct then
+            print("[DEN HUB] Found net directly in ReplicatedStorage")
+            return direct
+        end
+        
+        -- Deep search
+        for _, v in pairs(ReplicatedStorage:GetDescendants()) do
+            if v.Name == "net" and v:IsA("Folder") then
+                print("[DEN HUB] Found net via deep search")
+                return v
+            end
+        end
+        
         return nil
     end
     
-    local net = findNetModule()
+    net = findNetModule()
     if not net then
-        warn("[DEN HUB] Net module not found!")
+        warn("[DEN HUB] Net module NOT found! Script may have limited functionality.")
         return false
     end
+    
+    print("[DEN HUB] Net module found! Searching for remotes...")
     
     local remoteNames = {
         "RF/ChargeFishingRod",
@@ -113,22 +125,27 @@ local function FindRemotes()
         "RE/EquipToolFromHotbar",
         "RF/SellAllItems",
         "RE/ReplicateTextEffect",
-        "RE/ActivateEnchantingAltar"
+        "RE/ActivateEnchantingAltar",
+        "RF/Cast",
+        "RF/Reel",
+        "RF/Complete"
     }
     
+    local foundCount = 0
     for _, name in ipairs(remoteNames) do
         local remote = net:FindFirstChild(name)
         if remote then
             Remotes[name] = remote
-        else
-            warn(string.format("[DEN HUB] Remote not found: %s", name))
+            print("[DEN HUB] ✓ Found: " .. name)
+            foundCount = foundCount + 1
         end
     end
     
-    return net
+    print("[DEN HUB] Found " .. foundCount .. " remotes total")
+    return foundCount > 0
 end
 
-local net = FindRemotes()
+FindRemotes()
 
 -- ═══════════════════════════════════════════════════════════
 --                    ANIMATION SETUP
@@ -309,60 +326,90 @@ local function UpdateDelayBasedOnRod()
 end
 
 -- ═══════════════════════════════════════════════════════════
---                    AUTO FISHING SYSTEM
+--                    AUTO FISHING SYSTEM (BLATANT)
 -- ═══════════════════════════════════════════════════════════
 
 local function StartAutoFish()
-    if State.AutoFish then return end
-    State.AutoFish = true
-    UpdateDelayBasedOnRod()
+    if State.AutoFish then 
+        Notify("Auto Fish", "Already running!", 2)
+        return 
+    end
     
-    Notify("Auto Fish", "Started!", 3)
+    State.AutoFish = true
+    Notify("Auto Fish", "STARTING...", 3)
+    
+    -- Debug check
+    if not net then
+        Notify("Error", "Net module not found!", 3)
+        State.AutoFish = false
+        return
+    end
+    
+    print("[DEN HUB] Starting AutoFish loop...")
+    print("[DEN HUB] Available remotes:", tostring(Remotes))
     
     task.spawn(function()
+        local loopCount = 0
         while State.AutoFish do
+            loopCount = loopCount + 1
+            
             SafePcall(function()
-                if not Remotes["RF/ChargeFishingRod"] or not Remotes["RF/RequestFishingMinigameStarted"] then
-                    warn("[DEN HUB] Required remotes not available")
+                -- Check remotes exist
+                local chargeRemote = Remotes["RF/ChargeFishingRod"]
+                local reelRemote = Remotes["RF/RequestFishingMinigameStarted"]
+                
+                if not chargeRemote or not reelRemote then
+                    print("[DEN HUB] LOOP " .. loopCount .. ": Remotes missing!")
+                    Notify("Error", "Required remotes not found", 2)
                     State.AutoFish = false
                     return
                 end
                 
+                print("[DEN HUB] LOOP " .. loopCount .. ": Casting...")
                 State.FishingActive = true
                 
-                -- Equip rod
+                -- Step 1: Equip rod
                 if Remotes["RE/EquipToolFromHotbar"] then
                     Remotes["RE/EquipToolFromHotbar"]:FireServer(1)
+                    task.wait(0.2)
                 end
-                task.wait(0.1)
                 
-                -- Charge rod
-                local chargeSuccess = SafePcall(function()
-                    return Remotes["RF/ChargeFishingRod"]:InvokeServer(workspace:GetServerTimeNow())
+                -- Step 2: Charge fishing rod (BLATANT)
+                local castSuccess, castResult = SafePcall(function()
+                    local result = chargeRemote:InvokeServer(workspace:GetServerTimeNow())
+                    print("[DEN HUB] LOOP " .. loopCount .. ": Charge result = " .. tostring(result))
+                    return result
                 end)
                 
-                if chargeSuccess and Animations.RodShake then
-                    Animations.RodShake:Play()
-                end
+                task.wait(0.3)
                 
-                task.wait(0.5)
+                -- Step 3: Start minigame with BLATANT values
+                local success, result = SafePcall(function()
+                    -- Try different coordinate approaches
+                    local approaches = {
+                        {x = 0, y = 0},           -- Center
+                        {x = -0.5, y = 1},        -- Original attempt
+                        {x = -0.75, y = 1},       -- Another attempt
+                        {x = -0.6, y = 0.9},      -- Slightly offset
+                    }
+                    
+                    local approach = approaches[(loopCount % #approaches) + 1]
+                    print("[DEN HUB] LOOP " .. loopCount .. ": Reeling with x=" .. approach.x .. " y=" .. approach.y)
+                    
+                    local res = reelRemote:InvokeServer(approach.x, approach.y)
+                    print("[DEN HUB] LOOP " .. loopCount .. ": Reel result = " .. tostring(res))
+                    return res
+                end)
                 
-                -- Start minigame
-                local x = -0.75 + (math.random(-500, 500) / 10000000)
-                local y = 1 + (math.random(-500, 500) / 10000000)
-                
-                if Animations.RodIdle then
-                    Animations.RodIdle:Play()
-                end
-                
-                Remotes["RF/RequestFishingMinigameStarted"]:InvokeServer(x, y)
                 Stats.TotalCaught = Stats.TotalCaught + 1
+                print("[DEN HUB] LOOP " .. loopCount .. ": Total caught = " .. Stats.TotalCaught)
                 
                 task.wait(CurrentDelay.Custom)
                 State.FishingActive = false
+                
             end)
             
-            task.wait(0.1)
+            task.wait(0.05)
         end
     end)
 end
@@ -377,6 +424,7 @@ local function StopAutoFish()
     if Animations.RodReel then Animations.RodReel:Stop() end
     
     Notify("Auto Fish", "Stopped!", 3)
+    print("[DEN HUB] AutoFish stopped. Total caught: " .. Stats.TotalCaught)
 end
 
 -- ═══════════════════════════════════════════════════════════
@@ -698,11 +746,14 @@ if UIAvailable and Rayfield then
         Callback = function()
             if Remotes["RF/SellAllItems"] then
                 SafePcall(function()
-                    Remotes["RF/SellAllItems"]:InvokeServer()
-                    Notify("Sell All", "Selling items...", 3)
+                    print("[DEN HUB] Attempting to sell items...")
+                    local result = Remotes["RF/SellAllItems"]:InvokeServer()
+                    print("[DEN HUB] Sell result: " .. tostring(result))
+                    Notify("Sell All", "Selling items... Result: " .. tostring(result), 3)
                 end)
             else
-                Notify("Error", "Sell remote not found", 3)
+                Notify("Error", "Sell remote not found! Available remotes: " .. tostring(table.concat(table.keys(Remotes), ", ")), 3)
+                print("[DEN HUB] Sell remote not found. Available:", Remotes)
             end
         end,
     })
@@ -909,7 +960,13 @@ _G.DENHUB = {
 }
 
 print("[DEN HUB] v3.1 loaded successfully!")
-print("[DEN HUB] Type: _G.DENHUB.StartAutoFish() to start fishing")
-print("[DEN HUB] Type: _G.DENHUB.StopAutoFish() to stop fishing")
-print("[DEN HUB] Type: _G.DENHUB.State to see all states")
-print("[DEN HUB] Type: _G.DENHUB.Stats to see statistics")
+print("[DEN HUB] ============================================")
+print("[DEN HUB] COMMAND USAGE:")
+print("[DEN HUB] _G.DENHUB.StartAutoFish() - START FISHING (WITH DEBUG)")
+print("[DEN HUB] _G.DENHUB.StopAutoFish()  - STOP FISHING")
+print("[DEN HUB] _G.DENHUB.State - CHECK CURRENT STATE")
+print("[DEN HUB] _G.DENHUB.Stats - CHECK STATISTICS") 
+print("[DEN HUB] ============================================")
+print("[DEN HUB] Net Module: " .. tostring(net))
+print("[DEN HUB] Remotes Found: " .. tostring(table.concat(table.keys(Remotes or {}), ", ")))
+print("[DEN HUB] ============================================")
