@@ -387,6 +387,15 @@ local function StartAutoFish()
     print("[DEN HUB] Starting AutoFish loop...")
     print("[DEN HUB] Available remotes:", tostring(Remotes))
     
+    -- Try to find complete/reel remotes
+    local completeRemote = nil
+    for remoteName, remote in pairs(Remotes) do
+        if remoteName:lower():find("complete") or remoteName:lower():find("reel") or remoteName:lower():find("success") then
+            completeRemote = remote
+            print("[DEN HUB] Found potential complete remote: " .. remoteName)
+        end
+    end
+    
     task.spawn(function()
         local loopCount = 0
         while State.AutoFish do
@@ -400,9 +409,6 @@ local function StartAutoFish()
                 
                 if not chargeRemote or not reelRemote then
                     print("[DEN HUB] LOOP " .. loopCount .. ": Required remotes missing!")
-                    print("[DEN HUB] ChargeRemote: " .. tostring(chargeRemote))
-                    print("[DEN HUB] ReelRemote: " .. tostring(reelRemote))
-                    
                     if loopCount == 1 then
                         Notify("Error", "Required remotes not found. Check console.", 3)
                     end
@@ -410,67 +416,129 @@ local function StartAutoFish()
                     return
                 end
                 
-                print("[DEN HUB] LOOP " .. loopCount .. ": Casting...")
+                print("[DEN HUB] ========== LOOP " .. loopCount .. " ==========")
                 State.FishingActive = true
                 
                 -- Step 1: Equip rod
                 if equipRemote then
                     SafePcall(function()
-                        equipRemote:FireServer(1)
+                        print("[DEN HUB] Step 1: Equipping rod...")
+                        if equipRemote:IsA("RemoteEvent") then
+                            equipRemote:FireServer(1)
+                        else
+                            equipRemote:InvokeServer(1)
+                        end
                     end)
-                    task.wait(0.5)
+                    task.wait(0.3)
                 end
                 
                 -- Step 2: Charge fishing rod
+                print("[DEN HUB] Step 2: Charging rod...")
                 local castSuccess, castResult = SafePcall(function()
                     if chargeRemote:IsA("RemoteFunction") then
-                        -- Try different parameter styles
                         local result = chargeRemote:InvokeServer()
-                        print("[DEN HUB] LOOP " .. loopCount .. ": Charge (no params) = " .. tostring(result))
+                        print("[DEN HUB] Charge result: " .. tostring(result))
                         return result
                     else
                         chargeRemote:FireServer()
+                        print("[DEN HUB] Charge fired")
                         return true
                     end
                 end)
                 
-                task.wait(0.5)
+                task.wait(0.8)
                 
-                -- Step 3: Start minigame
-                local success, result = SafePcall(function()
-                    print("[DEN HUB] LOOP " .. loopCount .. ": Starting minigame...")
+                -- Step 3: Complete minigame - most important part
+                print("[DEN HUB] Step 3: Completing minigame...")
+                
+                local minigameCompleted = false
+                local attempts = 0
+                
+                -- Try multiple ways to complete
+                SafePcall(function()
+                    -- First try: Direct complete remotes
+                    local completeOptions = {
+                        Remotes["Complete"],
+                        Remotes["RF/Complete"],
+                        Remotes["RE/Complete"],
+                        Remotes["Reel"],
+                        Remotes["RF/Reel"],
+                        completeRemote
+                    }
                     
-                    if reelRemote:IsA("RemoteFunction") then
-                        -- Try invoking with various parameters
-                        local attempts = {
-                            function() return reelRemote:InvokeServer() end,
-                            function() return reelRemote:InvokeServer(0, 0) end,
-                            function() return reelRemote:InvokeServer(0.5, 0.5) end,
-                            function() return reelRemote:InvokeServer(Vector2.new(0, 0)) end,
+                    for _, remote in ipairs(completeOptions) do
+                        if remote then
+                            attempts = attempts + 1
+                            SafePcall(function()
+                                print("[DEN HUB] Attempting complete method " .. attempts)
+                                if remote:IsA("RemoteFunction") then
+                                    local res = remote:InvokeServer()
+                                    print("[DEN HUB] Method " .. attempts .. " result: " .. tostring(res))
+                                    minigameCompleted = true
+                                else
+                                    remote:FireServer()
+                                    print("[DEN HUB] Method " .. attempts .. " fired")
+                                    minigameCompleted = true
+                                end
+                            end)
+                            if minigameCompleted then break end
+                        end
+                    end
+                    
+                    -- Second try: Invoke reel remote with various params
+                    if not minigameCompleted and reelRemote then
+                        print("[DEN HUB] Trying ReelRemote with parameters...")
+                        local paramAttempts = {
+                            function() 
+                                print("[DEN HUB] Reel param: no args")
+                                return reelRemote:InvokeServer() 
+                            end,
+                            function() 
+                                print("[DEN HUB] Reel param: true")
+                                return reelRemote:InvokeServer(true) 
+                            end,
+                            function() 
+                                print("[DEN HUB] Reel param: success bool")
+                                return reelRemote:InvokeServer(true, true) 
+                            end,
+                            function() 
+                                print("[DEN HUB] Reel param: 1, 1")
+                                return reelRemote:InvokeServer(1, 1) 
+                            end,
+                            function() 
+                                print("[DEN HUB] Reel param: 0.5, 0.5")
+                                return reelRemote:InvokeServer(0.5, 0.5) 
+                            end,
                         }
                         
-                        for i, attemptFunc in ipairs(attempts) do
-                            local ok, res = pcall(attemptFunc)
+                        for i, paramFunc in ipairs(paramAttempts) do
+                            attempts = attempts + 1
+                            local ok, res = pcall(paramFunc)
                             if ok then
-                                print("[DEN HUB] LOOP " .. loopCount .. ": Reel attempt " .. i .. " = " .. tostring(res))
-                                return res
+                                print("[DEN HUB] ReelRemote attempt " .. i .. ": " .. tostring(res))
+                                minigameCompleted = true
+                                break
                             end
                         end
-                    else
-                        reelRemote:FireServer()
-                        return true
                     end
+                    
                 end)
                 
-                Stats.TotalCaught = Stats.TotalCaught + 1
-                print("[DEN HUB] LOOP " .. loopCount .. ": Total caught = " .. Stats.TotalCaught)
+                if minigameCompleted then
+                    Stats.TotalCaught = Stats.TotalCaught + 1
+                    Notify("Fish!", "Caught #" .. Stats.TotalCaught, 1)
+                    print("[DEN HUB] Fish caught! Total: " .. Stats.TotalCaught)
+                else
+                    print("[DEN HUB] WARNING: Minigame might not have completed properly")
+                end
                 
                 task.wait(CurrentDelay.Custom)
                 State.FishingActive = false
+                print("[DEN HUB] ========== END LOOP " .. loopCount .. " ==========\n")
                 
             end)
             
-            task.wait(0.05)
+            task.wait(0.1)
         end
     end)
 end
